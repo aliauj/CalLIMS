@@ -1,0 +1,196 @@
+{% extends "administration/base_admin.html" %}
+{% load licensing %}
+{% block title %}License & Settings — CalLIMS Admin{% endblock %}
+{% block content %}
+<div class="space-y-6">
+
+  <div class="flex justify-between items-center">
+    <h2 class="text-2xl font-bold text-gray-900">License &amp; Lab Settings</h2>
+  </div>
+
+  <!-- ── License status card ─────────────────────────────────────────── -->
+  <div class="bg-white rounded-xl shadow overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <h3 class="font-semibold text-gray-900">Active License</h3>
+      {% if user.role == 'ADMIN' %}
+      <button onclick="document.getElementById('activateModal').classList.remove('hidden')"
+              class="text-xs px-3 py-1.5 bg-blue-700 text-white rounded-lg hover:bg-blue-800">
+        &#128273; Activate / Replace Key
+      </button>
+      {% endif %}
+    </div>
+
+    {% if license and license.is_valid %}
+    {% with dr=license.days_remaining %}
+    <div class="px-6 py-5 grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="md:col-span-2">
+        <dl class="grid grid-cols-2 gap-y-3 text-sm">
+          <dt class="text-gray-500">License ID</dt>
+          <dd class="font-mono font-semibold text-gray-800">{{ license.license_id }}</dd>
+
+          <dt class="text-gray-500">Issued to</dt>
+          <dd class="font-medium">{{ license.issued_to }}</dd>
+
+          <dt class="text-gray-500">Contact</dt>
+          <dd class="text-gray-600">{{ license.issued_to_email|default:"—" }}</dd>
+
+          <dt class="text-gray-500">Subscription Tier</dt>
+          <dd>
+            <span class="px-2 py-0.5 rounded-full text-xs font-bold
+              {% if license.tier == 'ENTERPRISE' %}bg-purple-100 text-purple-800
+              {% elif license.tier == 'PROFESSIONAL' %}bg-blue-100 text-blue-800
+              {% else %}bg-gray-100 text-gray-700{% endif %}">
+              {{ license.get_tier_display }}
+            </span>
+          </dd>
+
+          <dt class="text-gray-500">Valid From</dt>
+          <dd>{{ license.valid_from|date:"N j, Y" }}</dd>
+
+          <dt class="text-gray-500">Valid Until</dt>
+          <dd class="{% if dr <= 30 %}text-orange-600 font-semibold{% else %}text-gray-800{% endif %}">
+            {{ license.valid_until|date:"N j, Y" }}
+            <span class="ml-2 text-xs {% if dr <= 30 %}text-orange-500{% else %}text-gray-400{% endif %}">
+              ({{ dr }} day{{ dr|pluralize }} remaining)
+            </span>
+          </dd>
+
+          <dt class="text-gray-500">Users</dt>
+          <dd>
+            {{ user_count }}
+            {% if license.max_users >= 0 %}
+              / {{ license.max_users }}
+              {% if license.user_limit_reached %}
+              <span class="ml-1 text-xs text-red-600 font-semibold">LIMIT REACHED</span>
+              {% endif %}
+            {% else %}
+              <span class="text-gray-400 text-xs ml-1">unlimited</span>
+            {% endif %}
+          </dd>
+
+          <dt class="text-gray-500">Activated by</dt>
+          <dd>{{ license.activated_by.get_full_name|default:"—" }}</dd>
+        </dl>
+      </div>
+
+      <!-- Validity gauge -->
+      <div class="flex flex-col items-center justify-center p-4 rounded-xl {% if dr <= 7 %}bg-red-50 border border-red-200{% elif dr <= 30 %}bg-orange-50 border border-orange-200{% else %}bg-green-50 border border-green-200{% endif %}">
+        <div class="text-4xl font-black {% if dr <= 7 %}text-red-600{% elif dr <= 30 %}text-orange-500{% else %}text-green-600{% endif %}">
+          {% if dr <= 0 %}EXPIRED{% elif dr < 100 %}{{ dr }}{% else %}{{ dr }}{% endif %}
+        </div>
+        <div class="text-sm {% if dr <= 7 %}text-red-500{% elif dr <= 30 %}text-orange-400{% else %}text-green-500{% endif %} mt-1">
+          {% if dr > 1 %}days remaining{% elif dr == 1 %}day remaining{% else %}subscription expired{% endif %}
+        </div>
+        <div class="mt-3 w-full bg-gray-200 rounded-full h-2">
+          {% with pct=license.valid_from|date:"U" %}
+          <div class="h-2 rounded-full {% if dr <= 7 %}bg-red-500{% elif dr <= 30 %}bg-orange-400{% else %}bg-green-500{% endif %}"
+               style="width: {% if dr <= 0 %}0{% elif dr > 365 %}100{% else %}{{ dr|floatformat:0 }}{% endif %}%">
+          </div>
+          {% endwith %}
+        </div>
+      </div>
+    </div>
+    {% endwith %}
+
+    {% elif license and license.is_expired %}
+    <div class="px-6 py-8 text-center">
+      <p class="text-red-600 font-semibold text-lg">&#9888; License Expired</p>
+      <p class="text-gray-500 text-sm mt-1">Expired on {{ license.valid_until|date:"N j, Y" }}. Please activate a new license key.</p>
+    </div>
+
+    {% else %}
+    <div class="px-6 py-8 text-center">
+      <p class="text-amber-600 font-semibold text-lg">&#128274; No Active License</p>
+      <p class="text-gray-500 text-sm mt-2">Paste your license key below to activate CalLIMS.</p>
+      {% if user.role == 'ADMIN' %}
+      <button onclick="document.getElementById('activateModal').classList.remove('hidden')"
+              class="mt-4 px-5 py-2 bg-blue-700 text-white text-sm rounded-lg hover:bg-blue-800">
+        Activate License
+      </button>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ── Module access table ─────────────────────────────────────────── -->
+  <div class="bg-white rounded-xl shadow overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-100">
+      <h3 class="font-semibold text-gray-900">Module Access</h3>
+      <p class="text-xs text-gray-400 mt-0.5">Controlled by your license tier. Contact your vendor to unlock additional modules.</p>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-px bg-gray-100">
+      {% for m in all_module_status %}
+      <div class="bg-white px-4 py-3 flex items-center gap-3">
+        {% if m.enabled %}
+        <span class="w-5 h-5 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-xs font-bold flex-shrink-0">&#10003;</span>
+        {% else %}
+        <span class="w-5 h-5 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center text-xs flex-shrink-0">&#10005;</span>
+        {% endif %}
+        <div>
+          <p class="text-sm font-medium {% if not m.enabled %}text-gray-400{% endif %}">{{ m.label }}</p>
+          {% if m.core %}<p class="text-xs text-blue-500">Core</p>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ── Lab Settings summary ────────────────────────────────────────── -->
+  <div class="bg-white rounded-xl shadow overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <h3 class="font-semibold text-gray-900">Lab Settings &amp; Branding</h3>
+      <a href="{% url 'licensing:lab_settings' %}" class="text-xs px-3 py-1.5 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50">
+        &#9998; Edit Settings
+      </a>
+    </div>
+    <div class="px-6 py-5 flex gap-8 items-start">
+      {% if lab.logo %}
+      <img src="{{ lab.logo.url }}" alt="{{ lab.lab_name }}" class="h-20 object-contain flex-shrink-0 rounded border border-gray-100 p-1">
+      {% else %}
+      <div class="h-20 w-20 flex-shrink-0 rounded border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-300 text-xs text-center">No Logo</div>
+      {% endif %}
+      <dl class="grid grid-cols-2 gap-y-2 text-sm flex-1">
+        <dt class="text-gray-500">Lab Name</dt><dd class="font-semibold">{{ lab.lab_name }}</dd>
+        <dt class="text-gray-500">Subtitle</dt><dd>{{ lab.lab_subtitle|default:"—" }}</dd>
+        <dt class="text-gray-500">Accreditation</dt><dd>{{ lab.accreditation_body|default:"—" }} {% if lab.accreditation_number %}<span class="font-mono text-xs text-gray-500">{{ lab.accreditation_number }}</span>{% endif %}</dd>
+        <dt class="text-gray-500">Address</dt><dd class="whitespace-pre-line text-xs text-gray-600">{{ lab.address|default:"—" }}</dd>
+        <dt class="text-gray-500">Phone</dt><dd>{{ lab.phone|default:"—" }}</dd>
+        <dt class="text-gray-500">Email</dt><dd>{{ lab.email|default:"—" }}</dd>
+        <dt class="text-gray-500">Website</dt><dd>{{ lab.website|default:"—" }}</dd>
+      </dl>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Activate license modal ──────────────────────────────────────── -->
+<div id="activateModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-4">
+    <div class="flex items-center justify-between">
+      <h3 class="text-lg font-bold text-gray-900">&#128273; Activate License Key</h3>
+      <button onclick="document.getElementById('activateModal').classList.add('hidden')"
+              class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+    </div>
+    <p class="text-sm text-gray-500">
+      Paste the license key provided by your CalLIMS vendor.
+      Activating a new key will replace the current license.
+    </p>
+    <form method="post" action="{% url 'licensing:activate' %}" class="space-y-3">
+      {% csrf_token %}
+      <textarea name="license_key" rows="5" required placeholder="Paste your license key here…"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+      <div class="flex gap-3">
+        <button type="submit" class="flex-1 py-2 bg-blue-700 text-white text-sm font-medium rounded-lg hover:bg-blue-800">
+          Activate
+        </button>
+        <button type="button"
+                onclick="document.getElementById('activateModal').classList.add('hidden')"
+                class="flex-1 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50">
+          Cancel
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

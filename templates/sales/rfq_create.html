@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}New RFQ — CalLIMS{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+  <div>
+    <p class="text-xs text-gray-500 uppercase tracking-wide mb-1"><a href="{% url 'sales:rfq_list' %}" class="hover:underline">RFQs</a> / New</p>
+    <h2 class="text-2xl font-bold text-gray-900">Register a new RFQ</h2>
+    <p class="text-gray-500 mt-1 text-sm">Capture what the customer asked for. The lab manager will review the scope and accept or reject.</p>
+  </div>
+
+  <form method="post" class="bg-white rounded-xl shadow p-6 space-y-5">
+    {% csrf_token %}
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Client <span class="text-red-500">*</span></label>
+        <select name="client" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+          <option value="">— select client —</option>
+          {% for c in clients %}<option value="{{ c.pk }}">{{ c.name }}</option>{% endfor %}
+        </select>
+        <p class="text-xs text-gray-400 mt-1">Don't see the customer? <a href="{% url 'clients:client_create' %}" class="text-blue-600 hover:underline">Add a new client first</a>.</p>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+        <select name="priority" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+          <option value="2" selected>Normal</option>
+          <option value="1">High</option>
+          <option value="3">Low</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Received Date</label>
+        <input type="date" name="received_date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Required By</label>
+        <input type="date" name="required_by" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Contact Person</label>
+        <input type="text" name="contact_person" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Contact Email</label>
+        <input type="email" name="contact_email" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Contact Phone</label>
+        <input type="text" name="contact_phone" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Service Scope <span class="text-red-500">*</span></label>
+      <textarea name="scope_description" rows="4" required placeholder="What does the customer want calibrated? Any standards, ranges, or specific requirements."
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"></textarea>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Internal Notes</label>
+      <textarea name="notes" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"></textarea>
+    </div>
+
+    <div class="flex justify-end gap-2 border-t pt-4">
+      <a href="{% url 'sales:rfq_list' %}" class="px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50">Cancel</a>
+      <button type="submit" class="px-4 py-2 bg-blue-800 text-white text-sm rounded-lg hover:bg-blue-700">Create RFQ</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

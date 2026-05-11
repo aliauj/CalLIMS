@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Module Not Available — {{ lab_settings.lab_name|default:"CalLIMS" }}{% endblock %}
+{% block content %}
+<div class="max-w-md mx-auto mt-12 text-center space-y-6">
+  <div class="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center text-3xl">
+    &#128274;
+  </div>
+  <div>
+    <h2 class="text-2xl font-bold text-gray-900">Module Not Available</h2>
+    <p class="text-gray-500 mt-2">
+      <strong>{{ module_label }}</strong> is not included in your current subscription plan.
+    </p>
+  </div>
+
+  {% if license %}
+  <div class="bg-gray-50 rounded-xl p-4 text-sm text-left space-y-1">
+    <p><span class="text-gray-500">Current plan:</span> <span class="font-semibold">{{ license.get_tier_display }}</span></p>
+    <p><span class="text-gray-500">License ID:</span> <span class="font-mono text-xs">{{ license.license_id }}</span></p>
+  </div>
+  {% endif %}
+
+  <p class="text-sm text-gray-500">
+    Contact <a href="https://www.auj-it.com" target="_blank" rel="noopener" class="text-blue-600 hover:underline">AUJ Tech</a>
+    to upgrade your subscription and unlock this module.
+  </p>
+
+  <a href="javascript:history.back()" class="inline-block px-5 py-2 bg-blue-700 text-white text-sm rounded-lg hover:bg-blue-800">
+    &larr; Go Back
+  </a>
+</div>
+{% endblock %}

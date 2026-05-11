@@ -1,0 +1,133 @@
+{% extends "administration/base_admin.html" %}
+{% block title %}{% if action == 'Edit' %}Edit Authorization{% else %}Add Authorization{% endif %} — CalLIMS Admin{% endblock %}
+{% block content %}
+<div class="space-y-4">
+
+  <!-- Header -->
+  <div class="flex justify-between items-center">
+    <h2 class="text-2xl font-bold text-gray-900">
+      {% if action == 'Edit' %}Edit Authorization{% else %}Add Authorization{% endif %}
+    </h2>
+    <a href="{% url 'administration:authorization_matrix' %}" class="text-sm text-blue-600 hover:underline">
+      &larr; Back to Matrix
+    </a>
+  </div>
+
+  <div class="bg-white rounded-xl shadow p-6 max-w-2xl">
+    <form method="post">
+      {% csrf_token %}
+      <div class="space-y-5">
+
+        <!-- Technician -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Technician</label>
+          {% if action == 'Edit' %}
+            <p class="text-sm text-gray-900 py-2">{{ auth.technician.get_full_name }}</p>
+          {% else %}
+            <select name="technician" required
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="">— Select technician —</option>
+              {% for tech in technicians %}
+              <option value="{{ tech.pk }}"
+                {% if preselect_technician == tech.pk|stringformat:'s' %}selected{% endif %}>
+                {{ tech.get_full_name }}
+              </option>
+              {% endfor %}
+            </select>
+          {% endif %}
+        </div>
+
+        <!-- Method -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Calibration Method</label>
+          {% if action == 'Edit' %}
+            <p class="text-sm text-gray-900 py-2">{{ auth.method.code }} — {{ auth.method.name }}</p>
+          {% else %}
+            <select name="method" required
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="">— Select method —</option>
+              {% for method in methods %}
+              <option value="{{ method.pk }}"
+                {% if preselect_method == method.pk|stringformat:'s' %}selected{% endif %}>
+                {{ method.code }} — {{ method.name }}
+              </option>
+              {% endfor %}
+            </select>
+          {% endif %}
+        </div>
+
+        <!-- Status -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+          <select name="status" required
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            {% for value, label in status_choices %}
+            <option value="{{ value }}"
+              {% if action == 'Edit' and auth.status == value %}selected
+              {% elif action == 'Create' and value == 'PENDING' %}selected{% endif %}>
+              {{ label }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Dates row -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Training Date</label>
+            <input type="date" name="training_date"
+              value="{% if action == 'Edit' and auth.training_date %}{{ auth.training_date|date:'Y-m-d' }}{% endif %}"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Evaluation Date</label>
+            <input type="date" name="evaluation_date"
+              value="{% if action == 'Edit' and auth.evaluation_date %}{{ auth.evaluation_date|date:'Y-m-d' }}{% endif %}"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              Expiry Date
+              <span class="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <input type="date" name="expiry_date"
+              value="{% if action == 'Edit' and auth.expiry_date %}{{ auth.expiry_date|date:'Y-m-d' }}{% endif %}"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+        </div>
+
+        <!-- Certificate Reference -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Certificate Reference</label>
+          <input type="text" name="certificate_ref" maxlength="100"
+            value="{% if action == 'Edit' %}{{ auth.certificate_ref }}{% endif %}"
+            placeholder="e.g. CERT-2024-001"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <!-- Notes -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+          <textarea name="notes" rows="3"
+            placeholder="Any relevant notes about this authorization..."
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">{% if action == 'Edit' %}{{ auth.notes }}{% endif %}</textarea>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center gap-3 pt-2 border-t border-gray-100">
+          <button type="submit"
+            class="px-5 py-2 bg-blue-800 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
+            {% if action == 'Edit' %}Save Changes{% else %}Create Authorization{% endif %}
+          </button>
+          <a href="{% url 'administration:authorization_matrix' %}"
+             class="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50">
+            Cancel
+          </a>
+        </div>
+
+      </div>
+    </form>
+  </div>
+
+</div>
+{% endblock %}

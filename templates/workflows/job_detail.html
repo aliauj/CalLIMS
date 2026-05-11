@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+{% block title %}{{ job.job_number }} — CalLIMS{% endblock %}
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header -->
+  <div class="flex justify-between items-start">
+    <div>
+      <p class="text-xs text-gray-500 uppercase tracking-wide mb-1"><a href="{% url 'workflows:job_list' %}" class="hover:underline">Jobs</a> / {{ job.job_number }}</p>
+      <h2 class="text-2xl font-bold text-gray-900">{{ job.job_number }}</h2>
+      <p class="text-gray-500 mt-0.5 text-sm">{{ job.instrument }} &mdash; {{ job.method }}</p>
+    </div>
+    <span class="px-3 py-1 rounded-full text-sm font-medium
+      {% if job.status == 'completed' %}bg-green-100 text-green-800
+      {% elif job.status == 'review' %}bg-yellow-100 text-yellow-800
+      {% elif job.status == 'approved' %}bg-purple-100 text-purple-800
+      {% elif job.status == 'cancelled' %}bg-red-100 text-red-800
+      {% elif job.status == 'on_hold' %}bg-gray-200 text-gray-700
+      {% else %}bg-blue-100 text-blue-800{% endif %}">
+      {{ job.get_status_display }}
+    </span>
+  </div>
+
+  <!-- Rejection notice — shown to technician when job was returned -->
+  {% if job.status == 'in_progress' and job.rejection_notes %}
+  <div class="bg-red-50 border border-red-200 rounded-xl p-4">
+    <div class="flex items-start gap-3">
+      <span class="text-red-500 text-lg mt-0.5">&#9888;</span>
+      <div>
+        <p class="font-semibold text-red-800 text-sm">Returned for correction</p>
+        <p class="text-red-700 text-sm mt-1 whitespace-pre-line">{{ job.rejection_notes }}</p>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- FSM Action Bar -->
+  {% if job.status != 'completed' and job.status != 'cancelled' %}
+  <div class="bg-white rounded-xl shadow px-5 py-4 flex flex-wrap gap-3 items-center border-l-4
+    {% if job.status == 'review' %}border-yellow-400
+    {% elif job.status == 'approved' %}border-purple-400
+    {% elif job.status == 'in_progress' %}border-blue-400
+    {% else %}border-gray-300{% endif %}">
+    <span class="text-sm font-medium text-gray-500 mr-1">Actions:</span>
+
+    {% if job.status == 'received' %}
+    <form method="post" action="{% url 'workflows:job_assign' job.pk %}" class="flex gap-2 items-center flex-wrap">
+      {% csrf_token %}
+      <div class="flex flex-col gap-0.5">
+        <select name="technician" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 min-w-56">
+          <option value="">— select technician —</option>
+          {% if authorized_techs %}
+          <optgroup label="✓ Authorized for {{ job.method.code }}">
+            {% for tech in authorized_techs %}
+            <option value="{{ tech.pk }}" {% if job.assigned_to_id == tech.pk %}selected{% endif %}>
+              {{ tech.get_full_name }}
+            </option>
+            {% endfor %}
+          </optgroup>
+          {% endif %}
+          {% if unauthorized_techs %}
+          <optgroup label="⚠ Not authorized for {{ job.method.code }}" disabled>
+            {% for tech in unauthorized_techs %}
+            <option value="{{ tech.pk }}" disabled>{{ tech.get_full_name }}</option>
+            {% endfor %}
+          </optgroup>
+          {% endif %}
+        </select>
+        {% if not authorized_techs %}
+        <p class="text-xs text-orange-600">No authorized technicians for {{ job.method.code }}.
+          <a href="{% url 'administration:authorization_matrix' %}" class="underline hover:text-orange-800">Manage authorizations →</a>
+        </p>
+        {% endif %}
+      </div>
+      <button type="submit" class="px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">Assign</button>
+    </form>
+    {% endif %}
+
+    {% if job.status == 'assigned' %}
+    <form method="post" action="{% url 'workflows:job_start' job.pk %}">{% csrf_token %}
+      <button type="submit" class="px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">Start Calibration</button>
+    </form>
+    {% endif %}
+
+    {% if job.status == 'in_progress' %}
+    <a href="{% url 'workflows:job_enter_results' job.pk %}" class="px-4 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700">Enter Readings</a>
+    <form method="post" action="{% url 'workflows:job_submit_review' job.pk %}">{% csrf_token %}
+      <button type="submit" class="px-4 py-1.5 bg-yellow-500 text-white text-sm rounded-lg hover:bg-yellow-600">Submit for Review</button>
+    </form>
+    {% endif %}
+
+    {% if job.status == 'review' %}
+    {% if user.role == 'REVIEWER' or user.role == 'MANAGER' or user.role == 'ADMIN' %}
+    <form method="post" action="{% url 'workflows:job_approve' job.pk %}">{% csrf_token %}
+      <button type="submit"
+              onclick="return confirm('Approve job {{ job.job_number }}? This will allow the certificate to be issued.')"
+              class="px-4 py-1.5 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700">Approve</button>
+    </form>
+    <button type="button"
+            onclick="document.getElementById('rejectModal').classList.remove('hidden')"
+            class="px-4 py-1.5 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600">
+      Return to Technician
+    </button>
+    {% else %}
+    <span class="text-sm text-gray-400 italic">Awaiting review by REVIEWER or MANAGER</span>
+    {% endif %}
+    {% endif %}
+
+    {% if job.status == 'approved' %}
+    <form method="post" action="{% url 'workflows:job_complete' job.pk %}">{% csrf_token %}
+      <button type="submit" class="px-4 py-1.5 bg-green-700 text-white text-sm rounded-lg hover:bg-green-800">Complete &amp; Issue Certificate</button>
+    </form>
+    {% endif %}
+
+    {% if job.status == 'received' or job.status == 'assigned' or job.status == 'in_progress' %}
+    <form method="post" action="{% url 'workflows:job_hold' job.pk %}">{% csrf_token %}
+      <button type="submit" class="px-4 py-1.5 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">Hold</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if user.role == 'ADMIN' or user.role == 'MANAGER' %}
+  <div class="flex justify-end">
+    <form method="post" action="{% url 'workflows:job_delete' job.pk %}">{% csrf_token %}
+      <button type="submit"
+              onclick="return confirm('Permanently delete job {{ job.job_number }}? This cannot be undone. Use this when a customer cancels a request.');"
+              class="px-4 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700">
+        Delete Job
+      </button>
+    </form>
+  </div>
+  {% endif %}
+
+  <!-- Job & Equipment info -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="bg-white rounded-xl shadow p-6">
+      <h3 class="font-semibold text-gray-900 border-b pb-2 mb-4">Job Details</h3>
+      <dl class="grid grid-cols-2 gap-y-3 text-sm">
+        <dt class="text-gray-500">Priority</dt>
+        <dd>{% if job.priority == 1 %}<span class="text-red-600 font-semibold">High</span>{% elif job.priority == 3 %}Low{% else %}Normal{% endif %}</dd>
+        <dt class="text-gray-500">Received</dt><dd>{{ job.received_date|date:"M d, Y" }}</dd>
+        <dt class="text-gray-500">Due Date</dt><dd>{{ job.due_date|date:"M d, Y"|default:"—" }}</dd>
+        <dt class="text-gray-500">Completed</dt><dd>{{ job.completed_date|date:"M d, Y"|default:"—" }}</dd>
+        <dt class="text-gray-500">Assigned To</dt><dd>{{ job.assigned_to.get_full_name|default:"Unassigned" }}</dd>
+        <dt class="text-gray-500">Reviewed By</dt><dd>{{ job.reviewed_by.get_full_name|default:"—" }}</dd>
+        <dt class="text-gray-500">Temperature</dt><dd>{{ job.temperature_c|default:"—" }}{% if job.temperature_c %} °C{% endif %}</dd>
+        <dt class="text-gray-500">Humidity</dt><dd>{{ job.humidity_pct|default:"—" }}{% if job.humidity_pct %} %{% endif %}</dd>
+      </dl>
+      {% if job.notes %}<div class="mt-4 p-3 bg-gray-50 rounded text-sm text-gray-600">{{ job.notes }}</div>{% endif %}
+    </div>
+    <div class="bg-white rounded-xl shadow p-6">
+      <h3 class="font-semibold text-gray-900 border-b pb-2 mb-4">Instrument Details</h3>
+      <dl class="grid grid-cols-2 gap-y-3 text-sm">
+        <dt class="text-gray-500">Instrument Tag</dt><dd class="font-mono font-semibold">{{ job.instrument.asset_tag }}</dd>
+        <dt class="text-gray-500">Serial #</dt><dd>{{ job.instrument.serial_number }}</dd>
+        <dt class="text-gray-500">Description</dt><dd>{{ job.instrument.description }}</dd>
+        <dt class="text-gray-500">Manufacturer</dt><dd>{{ job.instrument.manufacturer|default:"—" }}</dd>
+        <dt class="text-gray-500">Model</dt><dd>{{ job.instrument.model_number|default:"—" }}</dd>
+        <dt class="text-gray-500">Client</dt><dd>{{ job.instrument.client|default:"Internal" }}</dd>
+      </dl>
+      <div class="mt-4">
+        <a href="{% url 'instruments:instrument_detail' job.instrument.pk %}" class="text-blue-600 text-sm hover:underline">View Instrument Record →</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Measurement Results -->
+  <div class="bg-white rounded-xl shadow overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+      <h3 class="font-semibold text-gray-900">Measurement Results</h3>
+      {% if job.status == 'in_progress' %}
+      <a href="{% url 'workflows:job_enter_results' job.pk %}" class="text-sm text-blue-600 hover:underline">+ Enter / Edit Readings</a>
+      {% endif %}
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-4 py-3 text-left font-medium text-gray-600">#</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600">Parameter / Point</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600">Nominal</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600">Measured (DUT)</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600">Error</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600">Tolerance</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600">u (std)</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600">k</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600">U (exp)</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600">Unit</th>
+            <th class="px-4 py-3 text-center font-medium text-gray-600">Result</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for r in results %}
+          <tr class="{% if r.pass_fail == False %}bg-red-50{% elif r.pass_fail %}bg-green-50{% endif %}">
+            <td class="px-4 py-3 text-gray-400">{{ r.sequence }}</td>
+            <td class="px-4 py-3 font-medium text-gray-800">{{ r.parameter }}</td>
+            <td class="px-4 py-3 text-right font-mono text-gray-600">{{ r.nominal_value|default:"—" }}</td>
+            <td class="px-4 py-3 text-right font-mono font-semibold text-gray-900">{{ r.measured_value }}</td>
+            <td class="px-4 py-3 text-right font-mono {% if r.error %}{% if r.error < 0 %}text-orange-600{% else %}text-gray-700{% endif %}{% endif %}">
+              {% if r.error %}{% if r.error > 0 %}+{% endif %}{{ r.error }}{% else %}—{% endif %}
+            </td>
+            <td class="px-4 py-3 text-right font-mono text-gray-500">{% if r.tolerance %}±{{ r.tolerance }}{% else %}—{% endif %}</td>
+            <td class="px-4 py-3 text-right font-mono text-gray-500">{{ r.standard_uncertainty }}</td>
+            <td class="px-4 py-3 text-right font-mono text-gray-500">{{ r.coverage_factor_k }}</td>
+            <td class="px-4 py-3 text-right font-mono text-gray-700">±{{ r.expanded_uncertainty }}</td>
+            <td class="px-4 py-3 text-gray-500">{{ r.unit.symbol }}</td>
+            <td class="px-4 py-3 text-center font-bold">
+              {% if r.pass_fail is None %}<span class="text-gray-400 font-normal">—</span>
+              {% elif r.pass_fail %}<span class="text-green-700">PASS</span>
+              {% else %}<span class="text-red-700">FAIL</span>{% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="11" class="px-4 py-10 text-center text-gray-400">
+            No results recorded yet.
+            {% if job.status == 'in_progress' %}
+            <a href="{% url 'workflows:job_enter_results' job.pk %}" class="text-blue-600 hover:underline ml-1">Enter readings</a>.
+            {% endif %}
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Certificate -->
+  {% if job.status == 'completed' %}
+  {% with cert=job.certificate %}
+  {% if cert %}
+  <div class="bg-green-50 border border-green-200 rounded-xl p-4 flex justify-between items-center">
+    <div>
+      <p class="font-semibold text-green-800">Certificate Issued</p>
+      <p class="text-sm text-green-600 font-mono">{{ cert.certificate_number }}</p>
+    </div>
+    <a href="{% url 'certificates:certificate_detail' cert.pk %}" class="bg-green-700 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-600">View Certificate</a>
+  </div>
+  {% endif %}
+  {% endwith %}
+  {% endif %}
+
+</div>
+
+<!-- Rejection Modal -->
+<div id="rejectModal" class="hidden fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
+    <h3 class="text-lg font-bold text-gray-900">Return to Technician</h3>
+    <p class="text-sm text-gray-500">Explain what needs to be corrected. The technician will see this message and be notified.</p>
+    <form method="post" action="{% url 'workflows:job_reject' job.pk %}">
+      {% csrf_token %}
+      <div class="space-y-2">
+        <label class="block text-sm font-medium text-gray-700">Reason for rejection <span class="text-red-500">*</span></label>
+        <textarea name="reason" rows="4" required placeholder="e.g. Reading at 50 °C is outside tolerance. Please re-check the DUT connection and re-measure…"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 resize-none"></textarea>
+      </div>
+      <div class="flex gap-3 mt-4">
+        <button type="submit" class="flex-1 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700">Confirm &amp; Return</button>
+        <button type="button"
+                onclick="document.getElementById('rejectModal').classList.add('hidden')"
+                class="flex-1 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

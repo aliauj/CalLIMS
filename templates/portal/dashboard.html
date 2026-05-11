@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Client Portal — CalLIMS{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <h2 class="text-2xl font-bold text-gray-900">Welcome, {{ user.get_full_name }}</h2>
+  {% if error %}
+  <div class="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">{{ error }}</div>
+  {% else %}
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="bg-white rounded-xl shadow p-5 border-l-4 border-blue-500">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Total Instruments</p>
+      <p class="text-3xl font-bold text-blue-700 mt-1">{{ instruments.count }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow p-5 border-l-4 border-green-500">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Certificates Available</p>
+      <p class="text-3xl font-bold text-green-700 mt-1">{{ certificates|length }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow p-5 border-l-4 border-yellow-500">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Due for Calibration (30d)</p>
+      <p class="text-3xl font-bold text-yellow-600 mt-1">{{ due_soon.count }}</p>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl shadow overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-200">
+      <h3 class="font-semibold text-gray-900">My Instruments &amp; Gauges</h3>
+    </div>
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Asset Tag</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Description</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Next Calibration</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for instr in instruments %}
+        <tr class="hover:bg-gray-50 {% if instr.is_overdue %}bg-red-50{% endif %}">
+          <td class="px-4 py-3 font-mono">
+            <a href="{% url 'portal:instrument_detail' instr.pk %}" class="text-blue-600 hover:underline">{{ instr.asset_tag }}</a>
+          </td>
+          <td class="px-4 py-3">{{ instr.description }}</td>
+          <td class="px-4 py-3">{{ instr.get_status_display }}</td>
+          <td class="px-4 py-3 {% if instr.is_overdue %}text-red-600 font-semibold{% else %}text-gray-600{% endif %}">
+            {{ instr.next_calibration_date|date:"M d, Y"|default:"Not scheduled" }}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="px-4 py-8 text-center text-gray-400">No instruments found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="bg-white rounded-xl shadow overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-200">
+      <h3 class="font-semibold text-gray-900">Recent Certificates</h3>
+    </div>
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Certificate #</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Instrument</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Issue Date</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Download</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for cert in certificates %}
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-3 font-mono">
+            <a href="{% url 'certificates:certificate_detail' cert.pk %}" class="text-blue-600 hover:underline">{{ cert.certificate_number }}</a>
+          </td>
+          <td class="px-4 py-3">{{ cert.job.instrument }}</td>
+          <td class="px-4 py-3 text-gray-500">{{ cert.issue_date|date:"M d, Y"|default:"—" }}</td>
+          <td class="px-4 py-3">
+            {% if cert.pdf_file %}
+            <a href="{% url 'certificates:certificate_pdf' cert.pk %}" class="text-blue-600 hover:underline text-xs" target="_blank">PDF</a>
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="px-4 py-8 text-center text-gray-400">No certificates available yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

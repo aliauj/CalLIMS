@@ -1,0 +1,213 @@
+{% extends "administration/base_admin.html" %}
+{% block title %}{{ action }} Certificate Template — CalLIMS Admin{% endblock %}
+{% block content %}
+<div class="max-w-3xl space-y-6">
+
+  <div>
+    <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">
+      <a href="{% url 'administration:certificate_template_list' %}" class="hover:underline">Certificate Templates</a> /
+      {{ action }}
+    </p>
+    <h2 class="text-2xl font-bold text-gray-900">{{ action }} Certificate Template</h2>
+  </div>
+
+  {% if messages %}
+  {% for m in messages %}
+  <div class="px-4 py-3 rounded-lg text-sm bg-red-50 text-red-800 border border-red-200">{{ m }}</div>
+  {% endfor %}
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data" class="space-y-6">
+    {% csrf_token %}
+
+    <!-- Identity -->
+    <div class="bg-white rounded-xl shadow p-6 space-y-5">
+      <h3 class="text-sm font-semibold text-gray-700 border-b pb-2">Template Identity</h3>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Template Name <span class="text-red-500">*</span></label>
+          <input type="text" name="name" required maxlength="200"
+                 value="{{ tmpl.name|default:'' }}"
+                 placeholder='e.g. "Mass & Force — UKAS" or "Temperature — Default"'
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Accreditation Scope</label>
+          <input type="text" name="accreditation_scope" maxlength="300"
+                 value="{{ tmpl.accreditation_scope|default:'' }}"
+                 placeholder='e.g. "Mass, Force, Torque — OIML R 111 / ISO 376"'
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+          <p class="text-xs text-gray-400 mt-1">Shown in small italic text under the lab name in the PDF header.</p>
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Accreditation Number</label>
+          <input type="text" name="accreditation_number" maxlength="100"
+                 value="{{ tmpl.accreditation_number|default:'' }}"
+                 placeholder='e.g. "UKAS No. 1234" or "ILAC-MRA / DAkkS D-K-15070-01-00"'
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+          <p class="text-xs text-gray-400 mt-1">The official accreditation reference number — shown on the QR verification page.</p>
+        </div>
+
+        <div class="md:col-span-2 flex items-center gap-3 bg-blue-50 border border-blue-100 rounded-lg p-3">
+          <input type="checkbox" name="is_default" id="is_default"
+                 {% if tmpl.is_default %}checked{% endif %}
+                 class="w-4 h-4 text-blue-600 rounded">
+          <label for="is_default" class="text-sm font-medium text-gray-700">
+            Mark as Default Template
+            <span class="ml-2 text-xs text-gray-500 font-normal">
+              (used for any calibration method that has no specific template assigned)
+            </span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Header branding -->
+    <div class="bg-white rounded-xl shadow p-6 space-y-5">
+      <h3 class="text-sm font-semibold text-gray-700 border-b pb-2">Header Branding</h3>
+
+      <!-- Logo upload -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Accreditation / Lab Logo</label>
+        {% if tmpl and tmpl.logo %}
+        <div class="flex items-center gap-4 mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+          <img src="{{ tmpl.logo.url }}" alt="Current logo"
+               style="max-height:56px; max-width:180px; object-fit:contain;">
+          <div class="text-xs text-gray-500">
+            <p class="font-medium">Current logo</p>
+            <p>{{ tmpl.logo.name }}</p>
+          </div>
+          <label class="ml-auto flex items-center gap-2 text-xs text-red-600 cursor-pointer">
+            <input type="checkbox" name="logo_clear" value="1" class="w-3.5 h-3.5">
+            Remove logo
+          </label>
+        </div>
+        {% endif %}
+        <input type="file" name="logo" accept="image/*"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+        <p class="text-xs text-gray-400 mt-1">
+          PNG or SVG recommended. Displayed at up to 160 × 56 px in the top-left corner.
+          Shown alongside the lab name — both are always printed.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Lab Name <span class="text-red-500">*</span></label>
+          <input type="text" name="lab_name" required maxlength="150"
+                 value="{{ tmpl.lab_name|default:'CalLIMS' }}"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+          <p class="text-xs text-gray-400 mt-1">Large bold text beside the logo.</p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Lab Subtitle</label>
+          <input type="text" name="lab_subtitle" maxlength="150"
+                 value="{{ tmpl.lab_subtitle|default:'Calibration Laboratory' }}"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+          <p class="text-xs text-gray-400 mt-1">e.g. "Calibration Laboratory"</p>
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Accreditation Text (top-right)</label>
+          <input type="text" name="accreditation_text" maxlength="255"
+                 value="{{ tmpl.accreditation_text|default:'ISO/IEC 17025 Accredited' }}"
+                 placeholder='e.g. "ISO/IEC 17025 Accredited — UKAS No. 1234"'
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+          <p class="text-xs text-gray-400 mt-1">Printed in bold blue in the top-right corner, next to the QR code.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Certificate body content -->
+    <div class="bg-white rounded-xl shadow p-6 space-y-5">
+      <h3 class="text-sm font-semibold text-gray-700 border-b pb-2">Certificate Body Content</h3>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Declaration Statement</label>
+        <textarea name="declaration_statement" rows="5"
+                  placeholder="We hereby certify that the above-described instrument was calibrated using methods traceable to national/international measurement standards in accordance with ISO/IEC 17025…"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 font-mono">{{ tmpl.declaration_statement|default:'' }}</textarea>
+        <p class="text-xs text-gray-400 mt-1">
+          Printed in a blue-bordered box above the signature block. Leave blank to omit.
+        </p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Footer Text</label>
+        <input type="text" name="footer_text" maxlength="500"
+               value="{{ tmpl.footer_text|default:'' }}"
+               placeholder='e.g. "This certificate may not be reproduced other than in full."'
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+        <p class="text-xs text-gray-400 mt-1">Appended after the SHA-256 hash in the PDF footer.</p>
+      </div>
+    </div>
+
+    <!-- Calibration sticker -->
+    <div class="bg-white rounded-xl shadow p-6 space-y-4">
+      <div class="border-b pb-2">
+        <h3 class="text-sm font-semibold text-gray-700">Calibration Sticker</h3>
+        <p class="text-xs text-gray-400 mt-0.5">
+          When enabled, a ready-to-cut 75&nbsp;&times;&nbsp;50&nbsp;mm sticker page is appended to the certificate PDF.
+          Print on a label printer, cut out, and apply to the calibrated instrument.
+        </p>
+      </div>
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input type="checkbox" name="include_sticker" id="include_sticker"
+               {% if tmpl.include_sticker or not tmpl %}checked{% endif %}
+               class="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
+        <span class="text-sm font-medium text-gray-700">
+          Append calibration sticker to certificate PDF
+          <span class="ml-2 text-xs text-gray-500 font-normal">
+            (Certificate No · Description · S/N · Cal Date · Due Date · QR code)
+          </span>
+        </span>
+      </label>
+    </div>
+
+    <!-- QR Code verification page -->
+    <div class="bg-white rounded-xl shadow p-6 space-y-4">
+      <div class="border-b pb-2">
+        <h3 class="text-sm font-semibold text-gray-700">QR Code — Verification Page Fields</h3>
+        <p class="text-xs text-gray-400 mt-0.5">
+          When someone scans the QR code on the certificate or sticker they land on a public verification page.
+          Choose which details appear on that page. If none are selected, a sensible default set is shown.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-8 text-sm">
+        {% for key, label in qr_field_choices %}
+        <label class="flex items-center gap-2.5 cursor-pointer">
+          <input type="checkbox"
+                 name="qr_info_fields"
+                 value="{{ key }}"
+                 {% if tmpl and key in tmpl.qr_info_fields %}checked{% elif not tmpl and key in qr_defaults %}checked{% endif %}
+                 class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500">
+          <span class="text-gray-700">{{ label }}</span>
+        </label>
+        {% endfor %}
+      </div>
+
+      <p class="text-xs text-gray-400">
+        Tip: always include <strong>Certificate Number</strong> and <strong>Valid Until</strong> so clients can quickly verify authenticity and validity.
+      </p>
+    </div>
+
+    <div class="flex gap-3">
+      <button type="submit"
+              class="px-6 py-2.5 bg-blue-800 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
+        {% if tmpl %}Save Template{% else %}Create Template{% endif %}
+      </button>
+      <a href="{% url 'administration:certificate_template_list' %}"
+         class="px-6 py-2.5 border border-gray-300 text-sm rounded-lg text-gray-700 hover:bg-gray-50">
+        Cancel
+      </a>
+    </div>
+
+  </form>
+
+</div>
+{% endblock %}

@@ -1,0 +1,241 @@
+{% extends "administration/base_admin.html" %}
+{% block title %}{{ user_obj.get_full_name }} — CalLIMS Admin{% endblock %}
+{% block content %}
+<div class="space-y-4" x-data="{ tab: 'account' }">
+
+  <!-- Header -->
+  <div class="flex justify-between items-center">
+    <div>
+      <h2 class="text-2xl font-bold text-gray-900">{{ user_obj.get_full_name }}</h2>
+      <p class="text-sm text-gray-500 mt-0.5">{{ user_obj.email }}</p>
+    </div>
+    <a href="{% url 'administration:user_list' %}" class="text-sm text-blue-600 hover:underline">&larr; Back to Users</a>
+  </div>
+
+  <!-- Tab bar -->
+  <div class="border-b border-gray-200">
+    <nav class="-mb-px flex gap-6">
+      <button @click="tab = 'account'"
+        :class="tab === 'account' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+        class="border-b-2 pb-3 px-1 text-sm font-medium whitespace-nowrap">
+        Account
+      </button>
+      <button @click="tab = 'permissions'"
+        :class="tab === 'permissions' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+        class="border-b-2 pb-3 px-1 text-sm font-medium whitespace-nowrap">
+        Module Permissions
+      </button>
+      {% if user_obj.role == 'TECHNICIAN' %}
+      <button @click="tab = 'authorizations'"
+        :class="tab === 'authorizations' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+        class="border-b-2 pb-3 px-1 text-sm font-medium whitespace-nowrap">
+        Method Authorizations
+      </button>
+      {% endif %}
+    </nav>
+  </div>
+
+  <!-- Tab 1: Account -->
+  <div x-show="tab === 'account'" x-cloak>
+    <div class="bg-white rounded-xl shadow p-6 max-w-2xl space-y-4">
+      <div class="grid grid-cols-2 gap-4 text-sm">
+        <div>
+          <p class="text-gray-500 font-medium">Full Name</p>
+          <p class="mt-0.5 text-gray-900">{{ user_obj.get_full_name }}</p>
+        </div>
+        <div>
+          <p class="text-gray-500 font-medium">Email</p>
+          <p class="mt-0.5 text-gray-900">{{ user_obj.email }}</p>
+        </div>
+        <div>
+          <p class="text-gray-500 font-medium">Role</p>
+          <p class="mt-0.5">
+            <span class="px-2 py-1 rounded-full text-xs font-medium
+              {% if user_obj.role == 'ADMIN' %}bg-purple-100 text-purple-800
+              {% elif user_obj.role == 'MANAGER' %}bg-blue-100 text-blue-800
+              {% elif user_obj.role == 'TECHNICIAN' %}bg-green-100 text-green-800
+              {% elif user_obj.role == 'CLIENT' %}bg-orange-100 text-orange-800
+              {% elif user_obj.role == 'AUDITOR' %}bg-yellow-100 text-yellow-800
+              {% else %}bg-gray-100 text-gray-700{% endif %}">
+              {{ user_obj.get_role_display }}
+            </span>
+          </p>
+        </div>
+        <div>
+          <p class="text-gray-500 font-medium">Status</p>
+          <p class="mt-0.5">
+            <span class="px-2 py-1 rounded-full text-xs {% if user_obj.is_active %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
+              {% if user_obj.is_active %}Active{% else %}Inactive{% endif %}
+            </span>
+          </p>
+        </div>
+        <div>
+          <p class="text-gray-500 font-medium">Date Joined</p>
+          <p class="mt-0.5 text-gray-900">{{ user_obj.date_joined|date:"M d, Y" }}</p>
+        </div>
+        <div>
+          <p class="text-gray-500 font-medium">Last Login IP</p>
+          <p class="mt-0.5 text-gray-900">{{ user_obj.last_login_ip|default:"—" }}</p>
+        </div>
+      </div>
+      <div class="pt-2 border-t border-gray-100">
+        <a href="{% url 'administration:user_edit' user_obj.pk %}"
+           class="inline-flex items-center px-4 py-2 bg-blue-800 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
+          Edit Account
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab 2: Module Permissions -->
+  <div x-show="tab === 'permissions'" x-cloak>
+    <div class="bg-white rounded-xl shadow p-6 space-y-4">
+      <p class="text-sm text-gray-600">
+        These settings override the default permissions for this user's role.
+        Admin users always have full access.
+      </p>
+
+      {% if user_obj.role == 'ADMIN' %}
+      <div class="p-3 bg-purple-50 border border-purple-200 rounded-lg text-sm text-purple-700">
+        Admin users always have full access regardless of these settings.
+      </div>
+      {% endif %}
+
+      <form method="post" action="{% url 'administration:user_permissions_save' user_obj.pk %}">
+        {% csrf_token %}
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-2 text-left font-medium text-gray-600 w-1/3">Module</th>
+                <th class="px-4 py-2 text-center font-medium text-gray-600">View</th>
+                <th class="px-4 py-2 text-center font-medium text-gray-600">Add</th>
+                <th class="px-4 py-2 text-center font-medium text-gray-600">Modify</th>
+                <th class="px-4 py-2 text-center font-medium text-gray-600">Delete</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              {% for value, label, perm in sections %}
+              <tr class="hover:bg-gray-50">
+                <td class="px-4 py-2 font-medium text-gray-700">{{ label }}</td>
+                <td class="px-4 py-2 text-center">
+                  <input type="checkbox" name="section_{{ value }}_view"
+                    {% if perm and perm.can_view %}checked{% endif %}
+                    class="rounded border-gray-300 text-blue-600">
+                </td>
+                <td class="px-4 py-2 text-center">
+                  <input type="checkbox" name="section_{{ value }}_add"
+                    {% if perm and perm.can_add %}checked{% endif %}
+                    class="rounded border-gray-300 text-blue-600">
+                </td>
+                <td class="px-4 py-2 text-center">
+                  <input type="checkbox" name="section_{{ value }}_modify"
+                    {% if perm and perm.can_modify %}checked{% endif %}
+                    class="rounded border-gray-300 text-blue-600">
+                </td>
+                <td class="px-4 py-2 text-center">
+                  <input type="checkbox" name="section_{{ value }}_delete"
+                    {% if perm and perm.can_delete %}checked{% endif %}
+                    class="rounded border-gray-300 text-blue-600">
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="flex items-center gap-3 pt-4">
+          <button type="submit"
+            class="px-4 py-2 bg-blue-800 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
+            Save Permissions
+          </button>
+        </div>
+      </form>
+
+      <!-- Reset to role defaults -->
+      <form method="post" action="{% url 'administration:user_permissions_save' user_obj.pk %}"
+            onsubmit="return confirm('Reset all permission overrides for this user? They will revert to role defaults.');">
+        {% csrf_token %}
+        <input type="hidden" name="reset" value="1">
+        <button type="submit"
+          class="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50">
+          Reset to Role Defaults
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Tab 3: Method Authorizations (Technicians only) -->
+  {% if user_obj.role == 'TECHNICIAN' %}
+  <div x-show="tab === 'authorizations'" x-cloak>
+    <div class="bg-white rounded-xl shadow p-6 space-y-4">
+      <div class="flex justify-between items-center">
+        <h3 class="text-base font-semibold text-gray-800">Method Authorizations</h3>
+        <a href="{% url 'administration:authorization_create' %}?technician={{ user_obj.pk }}"
+           class="px-3 py-2 bg-blue-800 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
+          + Add Authorization
+        </a>
+      </div>
+
+      {% if auth_records %}
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-2 text-left font-medium text-gray-600">Method Code</th>
+              <th class="px-4 py-2 text-left font-medium text-gray-600">Method Name</th>
+              <th class="px-4 py-2 text-left font-medium text-gray-600">Status</th>
+              <th class="px-4 py-2 text-left font-medium text-gray-600">Training Date</th>
+              <th class="px-4 py-2 text-left font-medium text-gray-600">Evaluation Date</th>
+              <th class="px-4 py-2 text-left font-medium text-gray-600">Expiry Date</th>
+              <th class="px-4 py-2 text-left font-medium text-gray-600">Authorized By</th>
+              <th class="px-4 py-2 text-left font-medium text-gray-600">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            {% for auth in auth_records %}
+            <tr class="hover:bg-gray-50 {% if auth.expiry_date and auth.expiry_date < today %}bg-yellow-50{% endif %}">
+              <td class="px-4 py-2 font-mono font-medium">{{ auth.method.code }}</td>
+              <td class="px-4 py-2 text-gray-700">{{ auth.method.name }}</td>
+              <td class="px-4 py-2">
+                <span class="px-2 py-1 rounded-full text-xs font-medium
+                  {% if auth.status == 'AUTHORIZED' %}bg-green-100 text-green-800
+                  {% elif auth.status == 'PENDING' %}bg-yellow-100 text-yellow-800
+                  {% elif auth.status == 'SUSPENDED' %}bg-orange-100 text-orange-800
+                  {% elif auth.status == 'REVOKED' %}bg-red-100 text-red-800
+                  {% else %}bg-gray-100 text-gray-700{% endif %}">
+                  {{ auth.get_status_display }}
+                </span>
+              </td>
+              <td class="px-4 py-2 text-gray-500">{{ auth.training_date|date:"M d, Y"|default:"—" }}</td>
+              <td class="px-4 py-2 text-gray-500">{{ auth.evaluation_date|date:"M d, Y"|default:"—" }}</td>
+              <td class="px-4 py-2 text-gray-500">
+                {% if auth.expiry_date %}
+                  <span class="{% if auth.expiry_date < today %}text-red-600 font-medium{% endif %}">
+                    {{ auth.expiry_date|date:"M d, Y" }}
+                  </span>
+                {% else %}—{% endif %}
+              </td>
+              <td class="px-4 py-2 text-gray-500">{{ auth.authorized_by.get_full_name|default:"—" }}</td>
+              <td class="px-4 py-2">
+                <a href="{% url 'administration:authorization_edit' auth.pk %}"
+                   class="text-blue-600 hover:underline text-xs font-medium">Edit</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-sm text-gray-400 py-4 text-center">No method authorizations found for this technician.</p>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+  // Pass today's date for expiry comparison in template
+  // (handled server-side via context — this comment is intentional)
+</script>
+{% endblock %}

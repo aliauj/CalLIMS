@@ -1,0 +1,308 @@
+{% extends "base.html" %}
+{% block title %}{{ cert.certificate_number }} — CalLIMS{% endblock %}
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header -->
+  <div class="flex justify-between items-start">
+    <div>
+      <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">
+        <a href="{% url 'certificates:certificate_list' %}" class="hover:underline">Certificates</a> / {{ cert.certificate_number }}
+      </p>
+      <h2 class="text-2xl font-bold text-gray-900 font-mono">{{ cert.certificate_number }}</h2>
+      <p class="text-gray-500 mt-0.5 text-sm">{{ cert.job.instrument }}</p>
+    </div>
+    <div class="flex gap-3 items-center flex-wrap justify-end">
+      <span class="px-3 py-1 rounded-full text-sm font-medium
+        {% if cert.status == 'ISSUED' %}bg-green-100 text-green-800
+        {% elif cert.status == 'SIGNED' %}bg-blue-100 text-blue-800
+        {% elif cert.status == 'PENDING_SIGN' %}bg-yellow-100 text-yellow-800
+        {% elif cert.status == 'REVOKED' %}bg-red-100 text-red-800
+        {% elif cert.status == 'SUPERSEDED' %}bg-gray-200 text-gray-600
+        {% else %}bg-gray-100 text-gray-700{% endif %}">
+        {{ cert.get_status_display }}
+      </span>
+      <a href="{% url 'certificates:certificate_print' cert.pk %}" class="px-4 py-2 bg-blue-800 text-white text-sm rounded-lg hover:bg-blue-700" target="_blank">Print / Download PDF</a>
+      <a href="{% url 'certificates:certificate_sticker_pdf' cert.pk %}" class="px-4 py-2 bg-green-700 text-white text-sm rounded-lg hover:bg-green-600" target="_blank">Print Sticker</a>
+    </div>
+  </div>
+
+  <!-- Action bar -->
+  {% if not user.is_client %}
+  <div class="bg-white rounded-xl shadow px-5 py-4 flex flex-wrap gap-3 items-center border-l-4
+    {% if cert.status == 'PENDING_SIGN' or cert.status == 'DRAFT' %}border-yellow-400
+    {% elif cert.status == 'SIGNED' %}border-blue-400
+    {% elif cert.status == 'ISSUED' %}border-green-400
+    {% elif cert.status == 'REVOKED' %}border-red-400
+    {% else %}border-gray-300{% endif %}">
+
+    <span class="text-sm font-medium text-gray-500 mr-1">Actions:</span>
+
+    {% if cert.status == 'DRAFT' or cert.status == 'PENDING_SIGN' %}
+      <a href="{% url 'certificates:certificate_edit' cert.pk %}"
+         class="px-4 py-1.5 bg-gray-700 text-white text-sm rounded-lg hover:bg-gray-600">
+        Edit Certificate Info
+      </a>
+    {% endif %}
+
+    {% if cert.status == 'DRAFT' or cert.status == 'PENDING_SIGN' %}
+      {% if user.role == 'REVIEWER' or user.role == 'MANAGER' or user.role == 'ADMIN' %}
+      <form method="post" action="{% url 'certificates:certificate_sign' cert.pk %}">
+        {% csrf_token %}
+        <button type="submit"
+                onclick="return confirm('Sign certificate {{ cert.certificate_number }} as {{ user.get_full_name }}?')"
+                class="px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
+          Sign Certificate
+        </button>
+      </form>
+      {% else %}
+      <span class="text-sm text-gray-400 italic">Awaiting signature from REVIEWER or MANAGER</span>
+      {% endif %}
+    {% endif %}
+
+    {% if cert.status == 'SIGNED' %}
+      {% if user.role == 'MANAGER' or user.role == 'ADMIN' %}
+      <form method="post" action="{% url 'certificates:certificate_issue' cert.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="px-4 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700">
+          Issue to Client
+        </button>
+      </form>
+      {% endif %}
+    {% endif %}
+
+    {% if cert.status == 'SIGNED' or cert.status == 'ISSUED' %}
+      {% if user.role == 'MANAGER' or user.role == 'ADMIN' %}
+      <button onclick="document.getElementById('revokeModal').classList.remove('hidden')"
+              class="px-4 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700">
+        Revoke
+      </button>
+      {% endif %}
+    {% endif %}
+
+    {% if user.role == 'ADMIN' or user.role == 'MANAGER' %}
+    <form method="post" action="{% url 'certificates:certificate_regenerate_pdf' cert.pk %}">
+      {% csrf_token %}
+      <button type="submit" class="px-4 py-1.5 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">
+        Regenerate PDF
+      </button>
+    </form>
+    {% endif %}
+
+    <!-- Raise NC trigger — available to all lab staff -->
+    {% if user.role != 'CLIENT' %}
+    <a href="{% url 'nonconformance:nc_create' %}?certificate={{ cert.pk }}"
+       class="px-4 py-1.5 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700">
+      Raise NC
+    </a>
+    {% endif %}
+
+  </div>
+  {% endif %}
+
+  <!-- Info cards -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+    <!-- Certificate info -->
+    <div class="bg-white rounded-xl shadow p-6">
+      <div class="flex items-center justify-between border-b pb-2 mb-4">
+        <h3 class="font-semibold text-gray-900">Certificate Information</h3>
+        {% if cert.status == 'DRAFT' or cert.status == 'PENDING_SIGN' %}
+        <a href="{% url 'certificates:certificate_edit' cert.pk %}" class="text-xs text-blue-600 hover:underline">Edit</a>
+        {% endif %}
+      </div>
+      <dl class="grid grid-cols-2 gap-y-4 text-sm">
+        <dt class="text-gray-500">Certificate No.</dt>
+        <dd class="font-mono font-semibold text-gray-900">{{ cert.certificate_number }}</dd>
+
+        <dt class="text-gray-500">Issue Date</dt>
+        <dd>{{ cert.issue_date|date:"d M Y"|default:"<span class='text-yellow-600 font-medium'>Not set</span>" }}</dd>
+
+        <dt class="text-gray-500">Expiry Date</dt>
+        <dd>
+          {% if cert.expiry_date %}
+            <span class="{% if cert.expiry_date < today %}text-red-600 font-semibold{% endif %}">
+              {{ cert.expiry_date|date:"d M Y" }}
+            </span>
+          {% else %}
+            <span class="text-yellow-600 font-medium">Not set</span>
+          {% endif %}
+        </dd>
+
+        <dt class="text-gray-500">Signed By</dt>
+        <dd class="font-medium">
+          {% if cert.signed_by %}
+            {{ cert.signed_by.get_full_name }}
+          {% elif cert.status == 'PENDING_SIGN' %}
+            <span class="text-yellow-600">Awaiting signature</span>
+          {% else %}
+            —
+          {% endif %}
+        </dd>
+
+        <dt class="text-gray-500">Signed At</dt>
+        <dd>{{ cert.signed_at|date:"d M Y H:i"|default:"—" }}</dd>
+
+        <dt class="text-gray-500">Status</dt>
+        <dd>
+          <span class="px-2 py-0.5 rounded-full text-xs font-medium
+            {% if cert.status == 'ISSUED' %}bg-green-100 text-green-800
+            {% elif cert.status == 'SIGNED' %}bg-blue-100 text-blue-800
+            {% elif cert.status == 'PENDING_SIGN' %}bg-yellow-100 text-yellow-800
+            {% elif cert.status == 'REVOKED' %}bg-red-100 text-red-800
+            {% else %}bg-gray-100 text-gray-600{% endif %}">
+            {{ cert.get_status_display }}
+          </span>
+        </dd>
+
+        <dt class="text-gray-500">Content Hash</dt>
+        <dd class="font-mono text-xs break-all text-gray-400">{{ cert.content_hash|default:"—"|truncatechars:20 }}</dd>
+      </dl>
+
+      {% if cert.notes %}
+      <div class="mt-4 p-3 bg-gray-50 rounded-lg text-sm text-gray-600 whitespace-pre-line border-l-2 border-gray-300">{{ cert.notes }}</div>
+      {% endif %}
+    </div>
+
+    <!-- Instrument & Method -->
+    <div class="bg-white rounded-xl shadow p-6">
+      <h3 class="font-semibold text-gray-900 border-b pb-2 mb-4">Instrument &amp; Method</h3>
+      <dl class="grid grid-cols-2 gap-y-4 text-sm">
+        <dt class="text-gray-500">Instrument Tag</dt>
+        <dd class="font-mono font-semibold">
+          <a href="{% url 'instruments:instrument_detail' cert.job.instrument.pk %}" class="text-blue-600 hover:underline">
+            {{ cert.job.instrument.asset_tag }}
+          </a>
+        </dd>
+        <dt class="text-gray-500">Description</dt>
+        <dd>{{ cert.job.instrument.description }}</dd>
+        <dt class="text-gray-500">Serial No.</dt>
+        <dd>{{ cert.job.instrument.serial_number }}</dd>
+        <dt class="text-gray-500">Manufacturer</dt>
+        <dd>{{ cert.job.instrument.manufacturer|default:"—" }}</dd>
+        <dt class="text-gray-500">Model</dt>
+        <dd>{{ cert.job.instrument.model_number|default:"—" }}</dd>
+        <dt class="text-gray-500">Client</dt>
+        <dd>{{ cert.job.instrument.client|default:"Internal" }}</dd>
+        <dt class="text-gray-500">Cal. Method</dt>
+        <dd>{{ cert.job.method.code }}</dd>
+        <dt class="text-gray-500">Job No.</dt>
+        <dd>
+          <a href="{% url 'workflows:job_detail' cert.job.pk %}" class="font-mono text-blue-600 hover:underline">
+            {{ cert.job.job_number }}
+          </a>
+        </dd>
+      </dl>
+    </div>
+
+  </div>
+
+  <!-- Measurement Results -->
+  {% if results %}
+  <div class="bg-white rounded-xl shadow overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-200">
+      <h3 class="font-semibold text-gray-900">Measurement Results</h3>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-4 py-3 text-left font-medium text-gray-600">#</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600">Parameter</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600">Nominal</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600">Measured</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600">Error</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600">U (expanded)</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600">Unit</th>
+            <th class="px-4 py-3 text-center font-medium text-gray-600">Result</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for r in results %}
+          <tr class="{% if r.pass_fail == False %}bg-red-50{% elif r.pass_fail %}bg-green-50{% endif %}">
+            <td class="px-4 py-3 text-gray-400">{{ r.sequence }}</td>
+            <td class="px-4 py-3 font-medium text-gray-800">{{ r.parameter }}</td>
+            <td class="px-4 py-3 text-right font-mono text-gray-600">{{ r.nominal_value|default:"—" }}</td>
+            <td class="px-4 py-3 text-right font-mono font-semibold">{{ r.measured_value }}</td>
+            <td class="px-4 py-3 text-right font-mono text-gray-600">
+              {% if r.error %}{% if r.error > 0 %}+{% endif %}{{ r.error }}{% else %}—{% endif %}
+            </td>
+            <td class="px-4 py-3 text-right font-mono">&plusmn;{{ r.expanded_uncertainty }}</td>
+            <td class="px-4 py-3 text-gray-500">{{ r.unit.symbol }}</td>
+            <td class="px-4 py-3 text-center font-bold">
+              {% if r.pass_fail is None %}<span class="text-gray-400 font-normal">—</span>
+              {% elif r.pass_fail %}<span class="text-green-700">PASS</span>
+              {% else %}<span class="text-red-700">FAIL</span>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Linked Nonconformances -->
+  {% if user.role != 'CLIENT' %}
+  {% with ncs=cert.nonconformances.all %}
+  {% if ncs %}
+  <div class="bg-white rounded-xl shadow p-5">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="font-semibold text-gray-900 text-sm">Nonconformances Raised</h3>
+      <a href="{% url 'nonconformance:nc_create' %}?certificate={{ cert.pk }}"
+         class="text-xs px-3 py-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700">+ Raise Another NC</a>
+    </div>
+    <div class="space-y-2">
+      {% for nc in ncs %}
+      <div class="flex items-center justify-between text-sm px-3 py-2 rounded-lg bg-gray-50 border border-gray-100">
+        <a href="{% url 'nonconformance:nc_detail' nc.pk %}"
+           class="font-mono font-semibold text-red-700 hover:underline">{{ nc.nc_number }}</a>
+        <span class="text-gray-600 truncate mx-3 flex-1">{{ nc.title }}</span>
+        <span class="text-xs px-2 py-0.5 rounded-full font-medium
+          {% if nc.status == 'CLOSED' %}bg-green-100 text-green-800
+          {% elif nc.severity == 'CRITICAL' %}bg-red-100 text-red-800
+          {% else %}bg-amber-100 text-amber-800{% endif %}">
+          {{ nc.get_status_display }}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  {% endwith %}
+  {% endif %}
+
+  <!-- Superseded notice -->
+  {% if cert.superseded_by %}
+  <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-800">
+    This certificate has been superseded by
+    <a href="{% url 'certificates:certificate_detail' cert.superseded_by.pk %}" class="font-mono font-semibold underline">
+      {{ cert.superseded_by.certificate_number }}
+    </a>.
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- Revoke Modal -->
+<div id="revokeModal" class="hidden fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
+    <h3 class="text-lg font-bold text-gray-900">Revoke Certificate</h3>
+    <p class="text-sm text-gray-500">This action cannot be undone. The certificate will be permanently marked as revoked.</p>
+    <form method="post" action="{% url 'certificates:certificate_revoke' cert.pk %}">
+      {% csrf_token %}
+      <div class="space-y-3">
+        <label class="block text-sm font-medium text-gray-700">Reason for Revocation <span class="text-red-500">*</span></label>
+        <textarea name="reason" rows="3" required placeholder="e.g. Equipment found out of tolerance after issue…"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500"></textarea>
+      </div>
+      <div class="flex gap-3 mt-4">
+        <button type="submit" class="flex-1 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700">Confirm Revoke</button>
+        <button type="button" onclick="document.getElementById('revokeModal').classList.add('hidden')"
+                class="flex-1 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

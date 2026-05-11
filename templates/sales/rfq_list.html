@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Sales / RFQs — CalLIMS{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="flex justify-between items-center">
+    <h2 class="text-2xl font-bold text-gray-900">Requests for Quotation</h2>
+    <a href="{% url 'sales:rfq_create' %}" class="bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">+ New RFQ</a>
+  </div>
+
+  <div class="flex flex-wrap gap-2">
+    <a href="?" class="px-3 py-1 rounded-full text-sm border {% if not status_filter %}bg-blue-800 text-white border-blue-800{% else %}bg-white text-gray-700 border-gray-300 hover:bg-gray-50{% endif %}">All</a>
+    {% for val, label in status_choices %}
+    <a href="?status={{ val }}" class="px-3 py-1 rounded-full text-sm border {% if status_filter == val %}bg-blue-800 text-white border-blue-800{% else %}bg-white text-gray-700 border-gray-300 hover:bg-gray-50{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </div>
+
+  <div class="bg-white rounded-xl shadow overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">RFQ Number</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Client</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Priority</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Received</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Required By</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Created By</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for rfq in rfqs %}
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-3"><a href="{% url 'sales:rfq_detail' rfq.pk %}" class="text-blue-600 hover:underline font-medium">{{ rfq.rfq_number }}</a></td>
+          <td class="px-4 py-3">{{ rfq.client.name }}</td>
+          <td class="px-4 py-3">
+            <span class="px-2 py-1 rounded-full text-xs font-medium
+              {% if rfq.status == 'PENDING' %}bg-yellow-100 text-yellow-800
+              {% elif rfq.status == 'ACCEPTED' %}bg-green-100 text-green-800
+              {% elif rfq.status == 'REJECTED' %}bg-red-100 text-red-800
+              {% elif rfq.status == 'READY_FOR_JOBS' %}bg-blue-100 text-blue-800
+              {% else %}bg-gray-100 text-gray-700{% endif %}">
+              {{ rfq.get_status_display }}
+            </span>
+          </td>
+          <td class="px-4 py-3">
+            {% if rfq.priority == 1 %}<span class="text-red-600 font-semibold">High</span>
+            {% elif rfq.priority == 3 %}Low
+            {% else %}Normal{% endif %}
+          </td>
+          <td class="px-4 py-3 text-gray-500">{{ rfq.received_date|date:"M d, Y" }}</td>
+          <td class="px-4 py-3 text-gray-500">{{ rfq.required_by|date:"M d, Y"|default:"—" }}</td>
+          <td class="px-4 py-3 text-gray-500">{{ rfq.created_by.get_full_name }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">No RFQs yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

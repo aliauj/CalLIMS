@@ -1,0 +1,123 @@
+{% extends "administration/base_admin.html" %}
+{% block title %}Admin Dashboard — CalLIMS{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <h2 class="text-2xl font-bold text-gray-900">System Overview</h2>
+
+  <!-- System Stats Grid -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div class="bg-white rounded-xl shadow p-5">
+      <p class="text-xs text-gray-500 uppercase tracking-wide font-medium">Total Users</p>
+      <p class="text-3xl font-bold text-blue-700 mt-1">{{ total_users }}</p>
+      <p class="text-xs text-gray-400 mt-1">{{ active_users }} active</p>
+    </div>
+    <div class="bg-white rounded-xl shadow p-5">
+      <p class="text-xs text-gray-500 uppercase tracking-wide font-medium">Instruments</p>
+      <p class="text-3xl font-bold text-blue-700 mt-1">{{ total_instruments }}</p>
+      <p class="text-xs {% if overdue_instruments %}text-red-500 font-medium{% else %}text-gray-400{% endif %} mt-1">{{ overdue_instruments }} overdue</p>
+    </div>
+    <div class="bg-white rounded-xl shadow p-5">
+      <p class="text-xs text-gray-500 uppercase tracking-wide font-medium">Ref. Standards</p>
+      <p class="text-3xl font-bold text-blue-700 mt-1">{{ total_standards }}</p>
+      <p class="text-xs {% if expiring_standards %}text-yellow-600 font-medium{% else %}text-gray-400{% endif %} mt-1">{{ expiring_standards }} expiring</p>
+    </div>
+    <div class="bg-white rounded-xl shadow p-5">
+      <p class="text-xs text-gray-500 uppercase tracking-wide font-medium">Certificates</p>
+      <p class="text-3xl font-bold text-blue-700 mt-1">{{ total_certificates }}</p>
+      <p class="text-xs text-gray-400 mt-1">{{ total_jobs }} total jobs</p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+    <!-- Jobs by status -->
+    <div class="bg-white rounded-xl shadow p-6">
+      <h3 class="font-semibold text-gray-900 mb-4">Jobs by Status</h3>
+      <div class="space-y-2">
+        {% for status, count in jobs_by_status.items %}
+        <div class="flex items-center justify-between text-sm">
+          <span class="flex items-center gap-2">
+            <span class="inline-block w-2 h-2 rounded-full
+              {% if status == 'completed' %}bg-green-500
+              {% elif status == 'review' %}bg-yellow-500
+              {% elif status == 'cancelled' %}bg-red-500
+              {% elif status == 'on_hold' %}bg-gray-400
+              {% else %}bg-blue-500{% endif %}"></span>
+            <span class="capitalize text-gray-700">{{ status|cut:"_" }}</span>
+          </span>
+          <span class="font-semibold text-gray-900">{{ count }}</span>
+        </div>
+        {% empty %}
+        <p class="text-gray-400 text-sm">No jobs yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Users by role -->
+    <div class="bg-white rounded-xl shadow p-6">
+      <h3 class="font-semibold text-gray-900 mb-4">Users by Role</h3>
+      <div class="space-y-2">
+        {% for role, count in users_by_role.items %}
+        <div class="flex items-center justify-between text-sm">
+          <span class="text-gray-700 capitalize">{{ role|lower }}</span>
+          <span class="font-semibold text-gray-900">{{ count }}</span>
+        </div>
+        {% empty %}
+        <p class="text-gray-400 text-sm">No users.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Recent Audit Log -->
+  <div class="bg-white rounded-xl shadow overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+      <h3 class="font-semibold text-gray-900">Recent Activity</h3>
+      <a href="{% url 'compliance:audit_log' %}" class="text-blue-600 text-sm hover:underline">Full audit log &rarr;</a>
+    </div>
+    <table class="w-full text-xs">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Time</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">User</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Action</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Object</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100 font-mono">
+        {% for log in recent_audit %}
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-2 text-gray-400 whitespace-nowrap">{{ log.timestamp|date:"M d H:i" }}</td>
+          <td class="px-4 py-2">{{ log.user.email|default:"system" }}</td>
+          <td class="px-4 py-2">
+            <span class="px-1.5 py-0.5 rounded text-xs
+              {% if log.action == 'CREATED' %}bg-green-100 text-green-700
+              {% elif log.action == 'DELETED' %}bg-red-100 text-red-700
+              {% elif log.action == 'UPDATED' %}bg-blue-100 text-blue-700
+              {% else %}bg-gray-100 text-gray-600{% endif %}">
+              {{ log.action }}
+            </span>
+          </td>
+          <td class="px-4 py-2 text-gray-600 max-w-xs truncate">{{ log.object_repr }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="px-4 py-6 text-center text-gray-400">No activity yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Quick actions -->
+  <div class="bg-white rounded-xl shadow p-6">
+    <h3 class="font-semibold text-gray-900 mb-4">Quick Actions</h3>
+    <div class="flex flex-wrap gap-3">
+      <a href="{% url 'administration:user_create' %}" class="bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">+ New User</a>
+      <a href="{% url 'administration:method_create' %}" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200">+ New Method</a>
+      <a href="{% url 'administration:category_create' %}" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200">+ New Category</a>
+      <a href="{% url 'administration:unit_create' %}" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200">+ New Unit</a>
+      <a href="{% url 'administration:certificate_template_list' %}" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200">Certificate Templates</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Subscription Required — {{ lab_settings.lab_name|default:"CalLIMS" }}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="h-full flex items-center justify-center">
+<div class="max-w-lg w-full mx-4">
+
+  <!-- Logo / Brand -->
+  <div class="text-center mb-8">
+    {% if lab_settings.logo %}
+    <img src="{{ lab_settings.logo.url }}" alt="{{ lab_settings.lab_name }}" class="h-16 mx-auto mb-4 object-contain">
+    {% endif %}
+    <h1 class="text-2xl font-bold text-gray-900">{{ lab_settings.lab_name|default:"CalLIMS" }}</h1>
+    <p class="text-gray-500 text-sm">{{ lab_settings.lab_subtitle|default:"Calibration Laboratory" }}</p>
+  </div>
+
+  <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
+
+    <!-- Status banner -->
+    {% if license %}
+    <div class="bg-red-600 px-6 py-4 text-white text-center">
+      <p class="text-lg font-bold">&#9888; Subscription Expired</p>
+      <p class="text-sm opacity-90 mt-0.5">
+        Your license expired on {{ license.valid_until|date:"N j, Y" }}.
+        System access has been suspended.
+      </p>
+    </div>
+    {% else %}
+    <div class="bg-amber-500 px-6 py-4 text-white text-center">
+      <p class="text-lg font-bold">&#128274; No License Found</p>
+      <p class="text-sm opacity-90 mt-0.5">
+        This CalLIMS installation has not been activated yet.
+      </p>
+    </div>
+    {% endif %}
+
+    <div class="px-6 py-6 space-y-4">
+
+      {% if license %}
+      <div class="bg-gray-50 rounded-lg p-4 text-sm space-y-1">
+        <div class="flex justify-between"><span class="text-gray-500">Licensed to</span><span class="font-medium">{{ license.issued_to }}</span></div>
+        <div class="flex justify-between"><span class="text-gray-500">License ID</span><span class="font-mono text-xs">{{ license.license_id }}</span></div>
+        <div class="flex justify-between"><span class="text-gray-500">Tier</span><span class="font-medium">{{ license.get_tier_display }}</span></div>
+        <div class="flex justify-between"><span class="text-gray-500">Expired</span><span class="text-red-600 font-semibold">{{ license.valid_until|date:"N j, Y" }}</span></div>
+      </div>
+      {% endif %}
+
+      <p class="text-sm text-gray-600 text-center">
+        Please contact your CalLIMS vendor to renew your subscription and receive a new license key.
+      </p>
+
+      {% if lab_settings.email or lab_settings.phone %}
+      <div class="text-center text-sm text-gray-500 space-y-0.5">
+        {% if lab_settings.phone %}<p>&#128222; {{ lab_settings.phone }}</p>{% endif %}
+        {% if lab_settings.email %}<p>&#9993; <a href="mailto:{{ lab_settings.email }}" class="text-blue-600 hover:underline">{{ lab_settings.email }}</a></p>{% endif %}
+      </div>
+      {% endif %}
+
+      <!-- Admin-only activation link -->
+      {% if user.is_authenticated and user.role == 'ADMIN' %}
+      <div class="border-t pt-4 text-center">
+        <p class="text-xs text-gray-400 mb-2">You are logged in as ADMIN.</p>
+        <a href="{% url 'licensing:status' %}" class="text-sm text-blue-600 hover:underline">
+          &#128273; Go to License Activation →
+        </a>
+      </div>
+      {% else %}
+      <div class="border-t pt-4 text-center">
+        <a href="{% url 'users:login' %}" class="text-sm text-blue-600 hover:underline">Login as Administrator to activate</a>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+
+  <p class="text-center text-xs text-gray-400 mt-6">
+    CalLIMS v1.0 &mdash; Developed by
+    <a href="https://www.auj-it.com" target="_blank" rel="noopener" class="hover:text-gray-500">AUJ Tech</a>
+    &middot; <a href="https://www.auj-it.com" target="_blank" rel="noopener" class="hover:text-gray-500">www.auj-it.com</a>
+  </p>
+</div>
+</body>
+</html>

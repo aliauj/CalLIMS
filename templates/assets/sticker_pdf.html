@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+{% if size == 'small' %}
+@page {
+  size: 50mm 30mm;
+  margin: 1mm;
+}
+body {
+  font-size: 5pt;
+  line-height: 1.3;
+}
+.asset-tag {
+  font-size: 9pt;
+}
+.title {
+  font-size: 7pt;
+}
+.lab-name {
+  font-size: 4pt;
+}
+.dates-label {
+  font-size: 4.5pt;
+}
+.dates-value {
+  font-size: 5pt;
+}
+.cert-number {
+  font-size: 4pt;
+}
+.tech-name {
+  font-size: 4pt;
+}
+.qr-img {
+  width: 18mm;
+  height: 18mm;
+}
+.accent-bar {
+  width: 2mm;
+}
+{% elif size == 'large' %}
+@page {
+  size: 100mm 70mm;
+  margin: 2mm;
+}
+body {
+  font-size: 8pt;
+  line-height: 1.4;
+}
+.asset-tag {
+  font-size: 16pt;
+}
+.title {
+  font-size: 12pt;
+}
+.lab-name {
+  font-size: 6.5pt;
+}
+.dates-label {
+  font-size: 7pt;
+}
+.dates-value {
+  font-size: 8pt;
+}
+.cert-number {
+  font-size: 6.5pt;
+}
+.tech-name {
+  font-size: 7pt;
+}
+.qr-img {
+  width: 38mm;
+  height: 38mm;
+}
+.accent-bar {
+  width: 3.5mm;
+}
+{% else %}{# medium — default #}
+@page {
+  size: 75mm 50mm;
+  margin: 2mm;
+}
+body {
+  font-size: 7pt;
+  line-height: 1.35;
+}
+.asset-tag {
+  font-size: 13pt;
+}
+.title {
+  font-size: 10pt;
+}
+.lab-name {
+  font-size: 5.5pt;
+}
+.dates-label {
+  font-size: 6pt;
+}
+.dates-value {
+  font-size: 7pt;
+}
+.cert-number {
+  font-size: 5.5pt;
+}
+.tech-name {
+  font-size: 6pt;
+}
+.qr-img {
+  width: 27mm;
+  height: 27mm;
+}
+.accent-bar {
+  width: 3mm;
+}
+{% endif %}
+
+body {
+  font-family: Arial, sans-serif;
+  color: #111111;
+  background: #ffffff;
+  width: 100%;
+  height: 100%;
+}
+
+/* Outer wrapper: green left accent bar + content */
+.sticker {
+  display: table;
+  width: 100%;
+  height: 100%;
+  border: 0.4mm solid #cccccc;
+  border-radius: 1mm;
+  overflow: hidden;
+}
+
+.accent-bar {
+  display: table-cell;
+  background-color: #16a34a;
+  vertical-align: top;
+}
+
+.content {
+  display: table-cell;
+  vertical-align: top;
+  padding: 1mm 1.5mm 1mm 1.5mm;
+  width: 100%;
+}
+
+/* Inner layout: left info column + right QR column */
+.inner {
+  display: table;
+  width: 100%;
+  height: 100%;
+}
+
+.info-col {
+  display: table-cell;
+  vertical-align: top;
+}
+
+.qr-col {
+  display: table-cell;
+  vertical-align: middle;
+  text-align: right;
+  padding-left: 1mm;
+}
+
+/* Header row */
+.header {
+  display: table;
+  width: 100%;
+  margin-bottom: 0.8mm;
+}
+
+.title-cell {
+  display: table-cell;
+  vertical-align: middle;
+}
+
+.title-badge {
+  display: inline-block;
+  background-color: #16a34a;
+  color: #ffffff;
+  font-weight: bold;
+  padding: 0.3mm 1.2mm;
+  border-radius: 0.5mm;
+  letter-spacing: 0.03em;
+}
+
+.title {
+  /* size set per breakpoint above */
+}
+
+.lab-name {
+  color: #555555;
+  margin-top: 0.4mm;
+}
+
+/* Asset tag */
+.asset-tag {
+  font-family: "Courier New", Courier, monospace;
+  font-weight: bold;
+  color: #111111;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 0.5mm;
+}
+
+/* Description */
+.description {
+  color: #444444;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 1mm;
+}
+
+/* Dates row */
+.dates-row {
+  display: table;
+  width: 100%;
+  margin-bottom: 0.8mm;
+  border-top: 0.2mm solid #e5e7eb;
+  padding-top: 0.6mm;
+}
+
+.date-cell {
+  display: table-cell;
+  width: 50%;
+  vertical-align: top;
+}
+
+.dates-label {
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  display: block;
+}
+
+.dates-value {
+  font-weight: bold;
+  color: #111111;
+  display: block;
+}
+
+.dates-value.overdue {
+  color: #dc2626;
+}
+
+/* Certificate & technician */
+.meta-row {
+  border-top: 0.2mm solid #e5e7eb;
+  padding-top: 0.6mm;
+}
+
+.cert-number {
+  font-family: "Courier New", Courier, monospace;
+  color: #374151;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cert-pending {
+  font-family: "Courier New", Courier, monospace;
+  color: #9ca3af;
+  font-style: italic;
+  display: block;
+}
+
+.tech-name {
+  color: #6b7280;
+  display: block;
+  margin-top: 0.3mm;
+}
+
+/* QR image */
+.qr-img {
+  display: block;
+  /* dimensions set per breakpoint above */
+}
+</style>
+</head>
+<body>
+
+<div class="sticker">
+  <div class="accent-bar"></div>
+  <div class="content">
+    <div class="inner">
+
+      <!-- Left info column -->
+      <div class="info-col">
+
+        <!-- Header: CALIBRATED badge + lab name -->
+        <div class="header">
+          <div class="title-cell">
+            <span class="title-badge title">CALIBRATED</span>
+            <span class="lab-name">{{ lab_name }}</span>
+          </div>
+        </div>
+
+        <!-- Asset tag -->
+        <div class="asset-tag">{{ equipment.asset_tag }}</div>
+
+        <!-- Description -->
+        <div class="description">{{ equipment.description|truncatechars:45 }}</div>
+
+        <!-- Cal date / Due date -->
+        <div class="dates-row">
+          <div class="date-cell">
+            <span class="dates-label">Cal Date</span>
+            <span class="dates-value">
+              {% if equipment.last_calibration_date %}{{ equipment.last_calibration_date|date:"M Y" }}{% else %}&mdash;{% endif %}
+            </span>
+          </div>
+          <div class="date-cell">
+            <span class="dates-label">Due Date</span>
+            <span class="dates-value{% if equipment.is_overdue %} overdue{% endif %}">
+              {% if equipment.next_calibration_date %}{{ equipment.next_calibration_date|date:"M Y" }}{% if equipment.is_overdue %} &#9888;{% endif %}{% else %}&mdash;{% endif %}
+            </span>
+          </div>
+        </div>
+
+        <!-- Certificate number + technician -->
+        <div class="meta-row">
+          {% if cert %}
+            <span class="cert-number">Cert: {{ cert.certificate_number }}</span>
+          {% else %}
+            <span class="cert-pending">PENDING CERT</span>
+          {% endif %}
+          {% if job and job.assigned_to %}
+            <span class="tech-name">Tech: {{ job.assigned_to.get_full_name|default:job.assigned_to.username }}</span>
+          {% endif %}
+        </div>
+
+      </div><!-- /info-col -->
+
+      <!-- Right QR column -->
+      <div class="qr-col">
+        <img class="qr-img" src="data:image/png;base64,{{ qr_b64 }}" alt="QR Code">
+      </div>
+
+    </div><!-- /inner -->
+  </div><!-- /content -->
+</div><!-- /sticker -->
+
+</body>
+</html>

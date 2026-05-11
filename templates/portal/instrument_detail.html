@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}{{ instrument.asset_tag }} — Client Portal — CalLIMS{% endblock %}
+{% block content %}
+<div class="space-y-6 max-w-4xl mx-auto">
+
+  <!-- Breadcrumb -->
+  <nav class="text-sm text-gray-500">
+    <a href="{% url 'portal:dashboard' %}" class="hover:text-blue-600">My Portal</a>
+    <span class="mx-2">/</span>
+    <span class="text-gray-900">{{ instrument.asset_tag }}</span>
+  </nav>
+
+  <!-- Header card -->
+  <div class="bg-white rounded-xl shadow p-6 flex flex-col sm:flex-row sm:items-start gap-4">
+    <div class="flex-1">
+      <h2 class="text-2xl font-bold text-gray-900">{{ instrument.asset_tag }}</h2>
+      <p class="text-gray-600 mt-1">{{ instrument.description }}</p>
+      {% if instrument.manufacturer or instrument.model_number %}
+      <p class="text-sm text-gray-500 mt-1">{{ instrument.manufacturer }}{% if instrument.manufacturer and instrument.model_number %} — {% endif %}{{ instrument.model_number }}</p>
+      {% endif %}
+    </div>
+    <div class="shrink-0">
+      {% if instrument.status == 'CALIBRATED' %}
+      <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">Calibrated</span>
+      {% elif instrument.status == 'ACTIVE' %}
+      <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">Active</span>
+      {% elif instrument.status == 'IN_CALIBRATION' %}
+      <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">In Calibration</span>
+      {% elif instrument.status == 'OVERDUE' %}
+      <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">Overdue</span>
+      {% else %}
+      <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-700">{{ instrument.get_status_display }}</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Details grid -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div class="bg-white rounded-xl shadow p-4">
+      <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Serial Number</p>
+      <p class="text-sm font-mono font-semibold text-gray-900">{{ instrument.serial_number|default:"—" }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow p-4">
+      <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Last Calibration</p>
+      <p class="text-sm font-semibold text-gray-900">{{ instrument.last_calibration_date|date:"M d, Y"|default:"Not yet calibrated" }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow p-4">
+      <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Next Calibration Due</p>
+      <p class="text-sm font-semibold {% if instrument.is_overdue %}text-red-600{% else %}text-gray-900{% endif %}">
+        {{ instrument.next_calibration_date|date:"M d, Y"|default:"Not scheduled" }}
+        {% if instrument.is_overdue %}<span class="text-xs ml-1 text-red-500">(Overdue)</span>{% endif %}
+      </p>
+    </div>
+  </div>
+
+  <!-- Certificates -->
+  <div class="bg-white rounded-xl shadow overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-100">
+      <h3 class="font-semibold text-gray-900">Calibration Certificates</h3>
+    </div>
+    {% if certificates %}
+    <div class="divide-y divide-gray-50">
+      {% for cert in certificates %}
+      <div class="px-6 py-4 flex items-center justify-between">
+        <div>
+          <p class="text-sm font-medium text-gray-900">{{ cert.certificate_number }}</p>
+          <p class="text-xs text-gray-500 mt-0.5">
+            Issued {{ cert.issue_date|date:"M d, Y"|default:"—" }}
+            {% if cert.expiry_date %} · Expires {{ cert.expiry_date|date:"M d, Y" }}{% endif %}
+          </p>
+        </div>
+        <div class="flex items-center gap-3">
+          <a href="{% url 'certificates:certificate_detail' cert.pk %}" class="text-sm text-blue-600 hover:underline">View</a>
+          {% if cert.pdf_file %}
+          <a href="{% url 'certificates:certificate_pdf' cert.pk %}" class="text-sm text-blue-600 hover:underline" target="_blank">PDF &#8599;</a>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="px-6 py-8 text-sm text-gray-400 text-center">No certificates issued yet.</p>
+    {% endif %}
+  </div>
+
+  <!-- Calibration history -->
+  <div class="bg-white rounded-xl shadow overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-100">
+      <h3 class="font-semibold text-gray-900">Calibration History</h3>
+    </div>
+    {% if jobs %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-4 py-3 text-left font-medium text-gray-600">Job #</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600">Method</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600">Created</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600">Completed</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for job in jobs %}
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 font-mono text-xs">{{ job.job_number }}</td>
+            <td class="px-4 py-3 text-gray-700">{{ job.method.code }} — {{ job.method.name }}</td>
+            <td class="px-4 py-3">
+              {% if job.status == 'completed' %}
+              <span class="px-2 py-0.5 rounded text-xs bg-green-100 text-green-800">Completed</span>
+              {% elif job.status == 'in_progress' %}
+              <span class="px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-800">In Progress</span>
+              {% elif job.status == 'review' %}
+              <span class="px-2 py-0.5 rounded text-xs bg-yellow-100 text-yellow-800">Under Review</span>
+              {% elif job.status == 'approved' %}
+              <span class="px-2 py-0.5 rounded text-xs bg-teal-100 text-teal-800">Approved</span>
+              {% else %}
+              <span class="px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700">{{ job.get_status_display }}</span>
+              {% endif %}
+            </td>
+            <td class="px-4 py-3 text-gray-500 text-xs">{{ job.created_at|date:"M d, Y" }}</td>
+            <td class="px-4 py-3 text-gray-500 text-xs">{{ job.completed_date|date:"M d, Y"|default:"—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="px-6 py-8 text-sm text-gray-400 text-center">No calibration history yet.</p>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

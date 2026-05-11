@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}{{ scheme }} — PT Scheme{% endblock %}
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header -->
+  <div class="flex items-start justify-between">
+    <div>
+      <p class="text-xs text-gray-500 uppercase tracking-wide mb-1"><a href="{% url 'proficiency:scheme_list' %}" class="hover:underline">Proficiency Testing</a> / {{ scheme.code }}</p>
+      <h2 class="text-2xl font-bold text-gray-900">{{ scheme.name }}</h2>
+      <p class="text-sm text-gray-500 mt-0.5">{{ scheme.provider.name }} · {{ scheme.year }} Round {{ scheme.round_number }}</p>
+    </div>
+    <div class="flex gap-2">
+      <a href="{% url 'proficiency:scheme_edit' scheme.pk %}" class="px-4 py-2 border border-gray-300 text-sm rounded-lg text-gray-700 hover:bg-gray-50">Edit Scheme</a>
+      <a href="{% url 'proficiency:participation_create' scheme.pk %}" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">+ Register Participation</a>
+    </div>
+  </div>
+
+  <!-- Scheme info cards -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div class="bg-white rounded-xl shadow p-4 border-l-4 border-blue-500">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Status</p>
+      <p class="mt-1 font-semibold text-gray-800">{{ scheme.get_status_display }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow p-4 border-l-4 border-purple-500">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Measurand</p>
+      <p class="mt-1 font-semibold text-gray-800">{{ scheme.measurand }}{% if scheme.unit_symbol %} [{{ scheme.unit_symbol }}]{% endif %}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow p-4 border-l-4 border-green-500">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Assigned Value</p>
+      <p class="mt-1 font-semibold text-gray-800">{{ scheme.assigned_value|default:"Not set" }}{% if scheme.unit_symbol and scheme.assigned_value %} {{ scheme.unit_symbol }}{% endif %}</p>
+      {% if scheme.assigned_std_dev %}<p class="text-xs text-gray-400 mt-0.5">σ = {{ scheme.assigned_std_dev }}</p>{% endif %}
+    </div>
+    <div class="bg-white rounded-xl shadow p-4 border-l-4 border-yellow-500">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Results Due</p>
+      <p class="mt-1 font-semibold text-gray-800">{{ scheme.results_due_date|date:"M d, Y"|default:"Not set" }}</p>
+    </div>
+  </div>
+
+  {% if scheme.description %}
+  <div class="bg-blue-50 rounded-xl p-4 text-sm text-blue-800 border border-blue-100">{{ scheme.description }}</div>
+  {% endif %}
+
+  <!-- Participations table -->
+  <div class="bg-white rounded-xl shadow overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+      <h3 class="font-semibold text-gray-900">Participations ({{ participations.count }})</h3>
+    </div>
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Technician</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Method</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Submitted Value</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">z-Score</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Performance</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for p in participations %}
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-3 font-medium text-gray-800">{{ p.technician.get_full_name|default:p.technician.email|default:"—" }}</td>
+          <td class="px-4 py-3 text-gray-600">{{ p.method.code|default:"—" }}</td>
+          <td class="px-4 py-3">
+            <span class="px-2 py-0.5 rounded-full text-xs
+              {% if p.status == 'EVALUATED' %}bg-green-100 text-green-800
+              {% elif p.status == 'RESULTS_SUBMITTED' %}bg-blue-100 text-blue-800
+              {% elif p.status == 'IN_PROGRESS' %}bg-yellow-100 text-yellow-800
+              {% else %}bg-gray-100 text-gray-600{% endif %}">
+              {{ p.get_status_display }}
+            </span>
+          </td>
+          <td class="px-4 py-3 font-mono text-gray-700">{{ p.submitted_value|default:"—" }}</td>
+          <td class="px-4 py-3 font-mono font-semibold
+            {% if p.z_score %}{% if p.z_score|floatformat:1 == '0.0' %}text-gray-600
+            {% elif p.performance == 'SATISFACTORY' %}text-green-600
+            {% elif p.performance == 'QUESTIONABLE' %}text-yellow-600
+            {% else %}text-red-600{% endif %}{% endif %}">
+            {{ p.z_score|default:"—" }}
+          </td>
+          <td class="px-4 py-3">
+            {% if p.performance != 'PENDING' %}
+            <span class="px-2 py-0.5 rounded-full text-xs font-medium
+              {% if p.performance == 'SATISFACTORY' %}bg-green-100 text-green-800
+              {% elif p.performance == 'QUESTIONABLE' %}bg-yellow-100 text-yellow-800
+              {% elif p.performance == 'UNSATISFACTORY' %}bg-red-100 text-red-800
+              {% else %}bg-gray-100 text-gray-600{% endif %}">
+              {{ p.get_performance_display }}
+            </span>
+            {% else %}—{% endif %}
+          </td>
+          <td class="px-4 py-3">
+            <a href="{% url 'proficiency:participation_detail' p.pk %}" class="text-blue-600 text-xs hover:underline">View</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">No participations registered yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+{% endblock %}

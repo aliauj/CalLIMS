@@ -1,0 +1,39 @@
+{% extends "administration/base_admin.html" %}
+{% block title %}{{ action }} Category — CalLIMS Admin{% endblock %}
+{% block content %}
+<div class="max-w-lg">
+  <h2 class="text-2xl font-bold text-gray-900 mb-6">{{ action }} Equipment Category</h2>
+  <form method="post" class="bg-white rounded-xl shadow p-6 space-y-4">
+    {% csrf_token %}
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Name <span class="text-red-500">*</span></label>
+      <input type="text" name="name" required value="{{ category.name|default:'' }}"
+        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">
+        Tag Prefix Code
+        <span class="text-xs font-normal text-gray-400 ml-1">2–5 uppercase letters</span>
+      </label>
+      <input type="text" name="code" maxlength="5"
+             value="{{ category.code|default:'' }}"
+             placeholder="e.g. ELE, TMP, MECH, PRES"
+             style="text-transform:uppercase"
+             class="w-40 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm font-mono tracking-widest">
+      <p class="text-xs text-gray-500 mt-1">
+        Used to auto-generate Instrument Tags, e.g. code <strong>ELE</strong> → <strong>ELE-0001</strong>, <strong>ELE-0002</strong>…
+        Leave blank to require manual tag entry.
+      </p>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+      <textarea name="description" rows="3"
+        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">{{ category.description|default:'' }}</textarea>
+    </div>
+    <div class="flex gap-3 pt-2">
+      <button type="submit" class="bg-blue-800 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 text-sm">Save Category</button>
+      <a href="{% url 'administration:category_list' %}" class="bg-gray-100 text-gray-700 px-6 py-2 rounded-lg font-medium hover:bg-gray-200 text-sm">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

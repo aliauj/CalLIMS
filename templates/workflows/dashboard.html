@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — CalLIMS{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <div class="flex justify-between items-center">
+    <h2 class="text-2xl font-bold text-gray-900">Lab Dashboard</h2>
+    <span class="text-sm text-gray-500">Welcome back, {{ user.get_full_name }}</span>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div class="bg-white rounded-xl shadow p-5 border-l-4 border-blue-500">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Jobs In Progress</p>
+      <p class="text-3xl font-bold text-blue-700 mt-1">{{ jobs_in_progress }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow p-5 border-l-4 border-yellow-500">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Pending Review</p>
+      <p class="text-3xl font-bold text-yellow-600 mt-1">{{ jobs_review }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow p-5 border-l-4 border-red-500">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Overdue Instruments</p>
+      <p class="text-3xl font-bold text-red-600 mt-1">{{ overdue_instruments }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow p-5 border-l-4 border-orange-500">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Standards Expiring (30d)</p>
+      <p class="text-3xl font-bold text-orange-600 mt-1">{{ expiring_standards }}</p>
+    </div>
+  </div>
+
+  <!-- Quick Actions -->
+  {% if user.is_lab_staff %}
+  <div class="flex gap-3 flex-wrap">
+    <a href="{% url 'workflows:job_create' %}" class="bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">+ New Job</a>
+    <a href="{% url 'instruments:instrument_create' %}" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200">+ Register Instrument</a>
+    <a href="{% url 'standards:standard_create' %}" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200">+ Add Standard</a>
+    <a href="{% url 'clients:client_create' %}" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200">+ Add Client</a>
+  </div>
+  {% endif %}
+
+  <!-- ── TECHNICIAN: My Pending Actions ─────────────────────── -->
+  {% if user.role == 'TECHNICIAN' %}
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+    <!-- Assigned, not started -->
+    <div class="bg-white rounded-xl shadow overflow-hidden border-l-4 border-blue-400">
+      <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+        <h3 class="font-semibold text-gray-900 text-sm">&#128203; Assigned to Me — Start Required</h3>
+        {% if pending_assigned %}<span class="text-xs bg-blue-100 text-blue-700 font-semibold px-2 py-0.5 rounded-full">{{ pending_assigned|length }}</span>{% endif %}
+      </div>
+      {% if pending_assigned %}
+      <ul class="divide-y divide-gray-50 text-sm">
+        {% for job in pending_assigned %}
+        <li class="px-5 py-3 flex justify-between items-center hover:bg-gray-50">
+          <div>
+            <a href="{% url 'workflows:job_detail' job.pk %}" class="font-medium text-blue-600 hover:underline">{{ job.job_number }}</a>
+            <span class="text-gray-500 ml-2">{{ job.instrument }}</span>
+          </div>
+          <div class="text-right">
+            {% if job.due_date %}<span class="text-xs {% if job.due_date < today %}text-red-600 font-semibold{% else %}text-gray-400{% endif %}">Due {{ job.due_date|date:"M d" }}</span>{% endif %}
+            <a href="{% url 'workflows:job_detail' job.pk %}" class="ml-3 text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700">Start →</a>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="px-5 py-6 text-sm text-gray-400 text-center">No jobs waiting to start.</p>
+      {% endif %}
+    </div>
+
+    <!-- Returned for correction -->
+    <div class="bg-white rounded-xl shadow overflow-hidden border-l-4 border-red-400">
+      <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+        <h3 class="font-semibold text-gray-900 text-sm">&#9888; Returned for Correction</h3>
+        {% if pending_corrections %}<span class="text-xs bg-red-100 text-red-700 font-semibold px-2 py-0.5 rounded-full">{{ pending_corrections|length }}</span>{% endif %}
+      </div>
+      {% if pending_corrections %}
+      <ul class="divide-y divide-gray-50 text-sm">
+        {% for job in pending_corrections %}
+        <li class="px-5 py-3 hover:bg-gray-50">
+          <div class="flex justify-between items-start">
+            <a href="{% url 'workflows:job_detail' job.pk %}" class="font-medium text-blue-600 hover:underline">{{ job.job_number }}</a>
+            <a href="{% url 'workflows:job_detail' job.pk %}" class="text-xs bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">Fix →</a>
+          </div>
+          <p class="text-xs text-gray-500 mt-1">{{ job.instrument }}</p>
+          <p class="text-xs text-red-600 mt-1 line-clamp-2">{{ job.rejection_notes|truncatechars:100 }}</p>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="px-5 py-6 text-sm text-gray-400 text-center">No corrections needed.</p>
+      {% endif %}
+    </div>
+
+  </div>
+  {% endif %}
+
+  <!-- ── MANAGER / ADMIN / REVIEWER: Pending Actions ────────── -->
+  {% if user.role == 'MANAGER' or user.role == 'ADMIN' or user.role == 'REVIEWER' %}
+  <div class="grid grid-cols-1 {% if user.role != 'REVIEWER' %}md:grid-cols-2{% endif %} gap-6">
+
+    <!-- Jobs awaiting review -->
+    <div class="bg-white rounded-xl shadow overflow-hidden border-l-4 border-yellow-400">
+      <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+        <h3 class="font-semibold text-gray-900 text-sm">&#128270; Jobs Awaiting Review</h3>
+        {% if pending_review_jobs %}<span class="text-xs bg-yellow-100 text-yellow-700 font-semibold px-2 py-0.5 rounded-full">{{ pending_review_jobs|length }}</span>{% endif %}
+      </div>
+      {% if pending_review_jobs %}
+      <ul class="divide-y divide-gray-50 text-sm">
+        {% for job in pending_review_jobs %}
+        <li class="px-5 py-3 flex justify-between items-center hover:bg-gray-50">
+          <div>
+            <a href="{% url 'workflows:job_detail' job.pk %}" class="font-medium text-blue-600 hover:underline">{{ job.job_number }}</a>
+            <span class="text-gray-500 ml-2">{{ job.instrument }}</span>
+            {% if job.assigned_to %}<span class="text-gray-400 text-xs ml-1">by {{ job.assigned_to.get_full_name }}</span>{% endif %}
+          </div>
+          <a href="{% url 'workflows:job_detail' job.pk %}" class="text-xs bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600">Review →</a>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="px-5 py-6 text-sm text-gray-400 text-center">No jobs pending review.</p>
+      {% endif %}
+    </div>
+
+    {% if user.role == 'MANAGER' or user.role == 'ADMIN' %}
+    <!-- Unassigned jobs -->
+    <div class="bg-white rounded-xl shadow overflow-hidden border-l-4 border-blue-300">
+      <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+        <h3 class="font-semibold text-gray-900 text-sm">&#128100; Unassigned Jobs</h3>
+        {% if unassigned_jobs %}<span class="text-xs bg-blue-100 text-blue-700 font-semibold px-2 py-0.5 rounded-full">{{ unassigned_jobs|length }}</span>{% endif %}
+      </div>
+      {% if unassigned_jobs %}
+      <ul class="divide-y divide-gray-50 text-sm">
+        {% for job in unassigned_jobs %}
+        <li class="px-5 py-3 flex justify-between items-center hover:bg-gray-50">
+          <div>
+            <a href="{% url 'workflows:job_detail' job.pk %}" class="font-medium text-blue-600 hover:underline">{{ job.job_number }}</a>
+            <span class="text-gray-500 ml-2">{{ job.instrument }}</span>
+            {% if job.priority == 1 %}<span class="ml-2 text-xs text-red-600 font-semibold">HIGH</span>{% endif %}
+          </div>
+          <a href="{% url 'workflows:job_detail' job.pk %}" class="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700">Assign →</a>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="px-5 py-6 text-sm text-gray-400 text-center">All received jobs are assigned.</p>
+      {% endif %}
+    </div>
+
+    <!-- Overdue & Expiring row -->
+    <div class="bg-white rounded-xl shadow overflow-hidden border-l-4 border-red-400">
+      <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+        <h3 class="font-semibold text-gray-900 text-sm">&#128680; Overdue Calibrations</h3>
+        {% if overdue_list %}<span class="text-xs bg-red-100 text-red-700 font-semibold px-2 py-0.5 rounded-full">{{ overdue_list|length }}</span>{% endif %}
+      </div>
+      {% if overdue_list %}
+      <ul class="divide-y divide-gray-50 text-sm">
+        {% for instr in overdue_list %}
+        <li class="px-5 py-3 flex justify-between items-center hover:bg-gray-50">
+          <div>
+            <a href="{% url 'instruments:instrument_detail' instr.pk %}" class="font-medium text-blue-600 hover:underline font-mono">{{ instr.asset_tag }}</a>
+            <span class="text-gray-500 ml-2 truncate">{{ instr.description|truncatechars:40 }}</span>
+          </div>
+          <span class="text-xs text-red-600 font-semibold whitespace-nowrap ml-3">{{ instr.next_calibration_date|date:"M d, Y" }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="px-5 py-6 text-sm text-gray-400 text-center">No overdue instruments.</p>
+      {% endif %}
+    </div>
+
+    <div class="bg-white rounded-xl shadow overflow-hidden border-l-4 border-orange-400">
+      <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+        <h3 class="font-semibold text-gray-900 text-sm">&#9200; Standards Expiring Soon</h3>
+        {% if expiring_list %}<span class="text-xs bg-orange-100 text-orange-700 font-semibold px-2 py-0.5 rounded-full">{{ expiring_list|length }}</span>{% endif %}
+      </div>
+      {% if expiring_list %}
+      <ul class="divide-y divide-gray-50 text-sm">
+        {% for std in expiring_list %}
+        <li class="px-5 py-3 flex justify-between items-center hover:bg-gray-50">
+          <div>
+            <a href="{% url 'standards:standard_detail' std.pk %}" class="font-medium text-blue-600 hover:underline">{{ std.name }}</a>
+            <span class="text-gray-400 ml-2 text-xs">{{ std.certificate_number }}</span>
+          </div>
+          <span class="text-xs {% if std.calibration_due_date <= today %}text-red-600 font-semibold{% else %}text-orange-600{% endif %} whitespace-nowrap ml-3">{{ std.calibration_due_date|date:"M d, Y" }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="px-5 py-6 text-sm text-gray-400 text-center">No standards expiring within 30 days.</p>
+      {% endif %}
+    </div>
+    {% endif %}
+
+  </div>
+  {% endif %}
+
+  <!-- Recent Jobs (all lab staff) -->
+  {% if user.is_lab_staff %}
+  <div class="bg-white rounded-xl shadow overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+      <h3 class="font-semibold text-gray-900">Recent Jobs</h3>
+      <a href="{% url 'workflows:job_list' %}" class="text-blue-600 text-sm hover:underline">View all &rarr;</a>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-4 py-3 text-left text-gray-600 font-medium">Job #</th>
+            <th class="px-4 py-3 text-left text-gray-600 font-medium">Instrument</th>
+            <th class="px-4 py-3 text-left text-gray-600 font-medium">Status</th>
+            <th class="px-4 py-3 text-left text-gray-600 font-medium">Assigned To</th>
+            <th class="px-4 py-3 text-left text-gray-600 font-medium">Received</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for job in recent_jobs %}
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-3"><a href="{% url 'workflows:job_detail' job.pk %}" class="text-blue-600 hover:underline font-medium">{{ job.job_number }}</a></td>
+            <td class="px-4 py-3">{{ job.instrument }}</td>
+            <td class="px-4 py-3">
+              <span class="px-2 py-1 rounded-full text-xs font-medium
+                {% if job.status == 'completed' %}bg-green-100 text-green-800
+                {% elif job.status == 'review' %}bg-yellow-100 text-yellow-800
+                {% elif job.status == 'on_hold' %}bg-gray-100 text-gray-700
+                {% elif job.status == 'cancelled' %}bg-red-100 text-red-800
+                {% else %}bg-blue-100 text-blue-800{% endif %}">
+                {{ job.get_status_display }}
+              </span>
+            </td>
+            <td class="px-4 py-3">{{ job.assigned_to.get_full_name|default:"&mdash;" }}</td>
+            <td class="px-4 py-3 text-gray-500">{{ job.received_date|date:"M d, Y" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="px-4 py-8 text-center text-gray-400">No jobs yet. <a href="{% url 'workflows:job_create' %}" class="text-blue-600 hover:underline">Create the first job</a>.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

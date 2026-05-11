@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Nonconformances — CalLIMS{% endblock %}
+{% block content %}
+<div class="space-y-6">
+
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-2xl font-bold text-gray-900">Nonconformances</h2>
+      <p class="text-sm text-gray-500 mt-0.5">Nonconforming work, complaints, and findings requiring corrective action</p>
+    </div>
+    {% if user.role != 'CLIENT' %}
+    <a href="{% url 'nonconformance:nc_create' %}"
+       class="px-4 py-2 bg-red-700 text-white text-sm font-medium rounded-lg hover:bg-red-800">
+      + Raise NC
+    </a>
+    {% endif %}
+  </div>
+
+  <!-- Filters -->
+  <form method="get" class="flex flex-wrap gap-3 items-end">
+    <div>
+      <label class="block text-xs font-medium text-gray-500 mb-1">Status</label>
+      <select name="status" onchange="this.form.submit()"
+              class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+        <option value="">All Statuses</option>
+        {% for val, label in status_choices %}
+        <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-gray-500 mb-1">Severity</label>
+      <select name="severity" onchange="this.form.submit()"
+              class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+        <option value="">All Severities</option>
+        {% for val, label in severity_choices %}
+        <option value="{{ val }}" {% if severity_filter == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% if status_filter or severity_filter %}
+    <a href="{% url 'nonconformance:nc_list' %}"
+       class="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg">
+      Clear
+    </a>
+    {% endif %}
+  </form>
+
+  <!-- Table -->
+  <div class="bg-white rounded-xl shadow overflow-hidden">
+    {% if ncs %}
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+        <tr>
+          <th class="px-4 py-3 text-left">NC Number</th>
+          <th class="px-4 py-3 text-left">Title</th>
+          <th class="px-4 py-3 text-left">Severity</th>
+          <th class="px-4 py-3 text-left">Status</th>
+          <th class="px-4 py-3 text-left">Source</th>
+          <th class="px-4 py-3 text-left">Certificate</th>
+          <th class="px-4 py-3 text-left">Technician</th>
+          <th class="px-4 py-3 text-left">Detected</th>
+          <th class="px-4 py-3 text-left">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for nc in ncs %}
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-3 font-mono font-semibold text-gray-800">
+            <a href="{% url 'nonconformance:nc_detail' nc.pk %}" class="hover:text-blue-600">
+              {{ nc.nc_number }}
+            </a>
+          </td>
+          <td class="px-4 py-3 text-gray-700 max-w-xs truncate">{{ nc.title }}</td>
+          <td class="px-4 py-3">
+            <span class="px-2 py-0.5 rounded-full text-xs font-semibold
+              {% if nc.severity == 'CRITICAL' %}bg-red-100 text-red-800
+              {% elif nc.severity == 'MAJOR' %}bg-orange-100 text-orange-800
+              {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+              {{ nc.get_severity_display }}
+            </span>
+          </td>
+          <td class="px-4 py-3">
+            <span class="px-2 py-0.5 rounded-full text-xs font-medium
+              {% if nc.status == 'CLOSED' %}bg-green-100 text-green-800
+              {% elif nc.status == 'AWAITING_VERIFICATION' %}bg-blue-100 text-blue-800
+              {% elif nc.status == 'INVESTIGATING' %}bg-purple-100 text-purple-800
+              {% else %}bg-red-100 text-red-800{% endif %}">
+              {{ nc.get_status_display }}
+            </span>
+          </td>
+          <td class="px-4 py-3 text-gray-500">{{ nc.get_source_display }}</td>
+          <td class="px-4 py-3 font-mono text-xs">
+            {% if nc.certificate %}
+            <a href="{% url 'certificates:certificate_detail' nc.certificate.pk %}" class="text-blue-600 hover:underline">
+              {{ nc.certificate.certificate_number }}
+            </a>
+            {% else %}&mdash;{% endif %}
+          </td>
+          <td class="px-4 py-3 text-gray-600">{{ nc.technician.get_full_name|default:"&mdash;" }}</td>
+          <td class="px-4 py-3 text-gray-500">{{ nc.detected_date|date:"M d, Y" }}</td>
+          <td class="px-4 py-3">
+            <a href="{% url 'nonconformance:nc_detail' nc.pk %}"
+               class="text-blue-600 text-xs hover:underline">View</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="px-6 py-12 text-center text-gray-400">
+      <p class="text-lg font-medium">No nonconformances found</p>
+      {% if status_filter or severity_filter %}
+      <p class="text-sm mt-1">Try clearing the filters.</p>
+      {% else %}
+      <p class="text-sm mt-1">Raise one from a certificate or use the button above.</p>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

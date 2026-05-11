@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Add Reference Standard — CalLIMS{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto">
+  <h2 class="text-2xl font-bold text-gray-900 mb-6">Add Reference Standard</h2>
+  <form method="post" class="bg-white rounded-xl shadow p-6 space-y-5">
+    {% csrf_token %}
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Serial Number <span class="text-red-500">*</span></label>
+        <input type="text" name="serial_number" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Name <span class="text-red-500">*</span></label>
+        <input type="text" name="name" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
+      </div>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Manufacturer</label>
+      <input type="text" name="manufacturer" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
+    </div>
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Uncertainty Value (k=1) <span class="text-red-500">*</span></label>
+        <input type="number" name="uncertainty_value" step="any" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Unit <span class="text-red-500">*</span></label>
+        <select name="uncertainty_unit" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
+          <option value="">— Select unit —</option>
+          {% for u in units %}<option value="{{ u.pk }}">{{ u.symbol }} — {{ u.name }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Calibration Date <span class="text-red-500">*</span></label>
+        <input type="date" name="calibration_date" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Due Date <span class="text-red-500">*</span></label>
+        <input type="date" name="calibration_due_date" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Certificate Number</label>
+        <input type="text" name="certificate_number" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Issued By</label>
+        <input type="text" name="issued_by" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
+      </div>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Custodian</label>
+      <select name="custodian" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
+        <option value="">— Not assigned —</option>
+        {% for s in staff %}<option value="{{ s.pk }}">{{ s.get_full_name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="flex gap-3 pt-2">
+      <button type="submit" class="bg-blue-800 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 text-sm">Save Standard</button>
+      <a href="{% url 'standards:standard_list' %}" class="bg-gray-100 text-gray-700 px-6 py-2 rounded-lg font-medium hover:bg-gray-200 text-sm">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

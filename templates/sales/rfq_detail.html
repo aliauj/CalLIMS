@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+{% block title %}{{ rfq.rfq_number }} — CalLIMS{% endblock %}
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header -->
+  <div class="flex justify-between items-start">
+    <div>
+      <p class="text-xs text-gray-500 uppercase tracking-wide mb-1"><a href="{% url 'sales:rfq_list' %}" class="hover:underline">RFQs</a> / {{ rfq.rfq_number }}</p>
+      <h2 class="text-2xl font-bold text-gray-900">{{ rfq.rfq_number }}</h2>
+      <p class="text-gray-500 mt-0.5 text-sm">{{ rfq.client.name }} &middot; submitted by {{ rfq.created_by.get_full_name }}</p>
+    </div>
+    <span class="px-3 py-1 rounded-full text-sm font-medium
+      {% if rfq.status == 'PENDING' %}bg-yellow-100 text-yellow-800
+      {% elif rfq.status == 'ACCEPTED' %}bg-green-100 text-green-800
+      {% elif rfq.status == 'REJECTED' %}bg-red-100 text-red-800
+      {% elif rfq.status == 'READY_FOR_JOBS' %}bg-blue-100 text-blue-800
+      {% else %}bg-gray-100 text-gray-700{% endif %}">
+      {{ rfq.get_status_display }}
+    </span>
+  </div>
+
+  {% if rfq.rejection_reason and rfq.status == 'REJECTED' %}
+  <div class="bg-red-50 border border-red-200 rounded-xl p-4">
+    <p class="font-semibold text-red-800 text-sm">Rejected by {{ rfq.reviewed_by.get_full_name|default:"manager" }}</p>
+    <p class="text-red-700 text-sm mt-1 whitespace-pre-line">{{ rfq.rejection_reason }}</p>
+  </div>
+  {% endif %}
+
+  <!-- Action bar -->
+  <div class="bg-white rounded-xl shadow px-5 py-4 flex flex-wrap gap-3 items-center border-l-4
+    {% if rfq.status == 'PENDING' %}border-yellow-400
+    {% elif rfq.status == 'ACCEPTED' %}border-green-400
+    {% elif rfq.status == 'READY_FOR_JOBS' %}border-blue-400
+    {% else %}border-gray-300{% endif %}">
+    <span class="text-sm font-medium text-gray-500 mr-1">Actions:</span>
+
+    {% if rfq.status == 'PENDING' and can_review %}
+    <form method="post" action="{% url 'sales:rfq_accept' rfq.pk %}">{% csrf_token %}
+      <button type="submit"
+              onclick="return confirm('Accept RFQ {{ rfq.rfq_number }}? Sales will be notified to register the instruments.');"
+              class="px-4 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700">Accept</button>
+    </form>
+    <button type="button"
+            onclick="document.getElementById('rejectModal').classList.remove('hidden')"
+            class="px-4 py-1.5 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600">
+      Reject
+    </button>
+    {% endif %}
+
+    {% if rfq.status == 'PENDING' and not can_review %}
+    <span class="text-sm text-gray-400 italic">Awaiting review by Lab Manager</span>
+    {% endif %}
+
+    {% if rfq.status == 'ACCEPTED' %}
+    <form method="post" action="{% url 'sales:rfq_send_to_lab' rfq.pk %}">{% csrf_token %}
+      <button type="submit"
+              {% if not linked_instruments %}disabled title="Register at least one instrument first"{% endif %}
+              onclick="return confirm('Notify the lab manager to create calibration jobs?');"
+              class="px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed">
+        Send to Lab Manager
+      </button>
+    </form>
+    {% endif %}
+
+    {% if rfq.status == 'READY_FOR_JOBS' %}
+    <span class="text-sm text-gray-600">Lab manager has been notified. Jobs can be created from <a href="{% url 'workflows:job_create' %}" class="text-blue-600 hover:underline">the Jobs page</a>.</span>
+    {% endif %}
+
+    <form method="post" action="{% url 'sales:rfq_delete' rfq.pk %}" class="ml-auto">{% csrf_token %}
+      <button type="submit"
+              onclick="return confirm('Permanently delete RFQ {{ rfq.rfq_number }}? This cannot be undone.');"
+              class="px-4 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700">Delete RFQ</button>
+    </form>
+  </div>
+
+  <!-- Two-column info -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="bg-white rounded-xl shadow p-6">
+      <h3 class="font-semibold text-gray-900 border-b pb-2 mb-4">RFQ Details</h3>
+      <dl class="grid grid-cols-2 gap-y-3 text-sm">
+        <dt class="text-gray-500">Priority</dt>
+        <dd>{% if rfq.priority == 1 %}<span class="text-red-600 font-semibold">High</span>{% elif rfq.priority == 3 %}Low{% else %}Normal{% endif %}</dd>
+        <dt class="text-gray-500">Received</dt><dd>{{ rfq.received_date|date:"M d, Y" }}</dd>
+        <dt class="text-gray-500">Required By</dt><dd>{{ rfq.required_by|date:"M d, Y"|default:"—" }}</dd>
+        <dt class="text-gray-500">Reviewed By</dt><dd>{{ rfq.reviewed_by.get_full_name|default:"—" }}</dd>
+        <dt class="text-gray-500">Reviewed At</dt><dd>{{ rfq.reviewed_at|date:"M d, Y H:i"|default:"—" }}</dd>
+        <dt class="text-gray-500">Sent to Lab</dt><dd>{{ rfq.sent_to_lab_at|date:"M d, Y H:i"|default:"—" }}</dd>
+      </dl>
+    </div>
+
+    <div class="bg-white rounded-xl shadow p-6">
+      <h3 class="font-semibold text-gray-900 border-b pb-2 mb-4">Customer Contact</h3>
+      <dl class="grid grid-cols-2 gap-y-3 text-sm">
+        <dt class="text-gray-500">Client</dt><dd><a href="{% url 'clients:client_detail' rfq.client.pk %}" class="text-blue-600 hover:underline">{{ rfq.client.name }}</a></dd>
+        <dt class="text-gray-500">Contact</dt><dd>{{ rfq.contact_person|default:rfq.client.contact_person|default:"—" }}</dd>
+        <dt class="text-gray-500">Email</dt><dd class="break-all">{{ rfq.contact_email|default:rfq.client.email|default:"—" }}</dd>
+        <dt class="text-gray-500">Phone</dt><dd>{{ rfq.contact_phone|default:rfq.client.phone|default:"—" }}</dd>
+      </dl>
+    </div>
+  </div>
+
+  <!-- Scope -->
+  <div class="bg-white rounded-xl shadow p-6">
+    <h3 class="font-semibold text-gray-900 border-b pb-2 mb-4">Service Scope</h3>
+    <p class="text-sm text-gray-700 whitespace-pre-line">{{ rfq.scope_description }}</p>
+    {% if rfq.notes %}<div class="mt-4 p-3 bg-gray-50 rounded text-sm text-gray-600 whitespace-pre-line">{{ rfq.notes }}</div>{% endif %}
+  </div>
+
+  <!-- Draft items -->
+  <div class="bg-white rounded-xl shadow p-6">
+    <div class="flex items-center justify-between border-b pb-2 mb-4">
+      <h3 class="font-semibold text-gray-900">Requested Items <span class="text-gray-400 text-sm">(as listed by customer)</span></h3>
+    </div>
+    {% if items %}
+    <table class="w-full text-sm">
+      <thead class="text-left text-gray-500 text-xs uppercase">
+        <tr><th class="py-2">#</th><th>Description</th><th>Mfr/Model</th><th>Serial</th><th>Qty</th><th>Notes</th><th class="text-right">Action</th></tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+      {% for item in items %}
+        <tr>
+          <td class="py-2 text-gray-500">{{ item.sequence }}</td>
+          <td>{{ item.description }}</td>
+          <td class="text-gray-500">{{ item.manufacturer }}{% if item.manufacturer and item.model_number %} / {% endif %}{{ item.model_number }}</td>
+          <td class="text-gray-500">{{ item.serial_number|default:"—" }}</td>
+          <td>{{ item.quantity }}</td>
+          <td class="text-gray-500">{{ item.notes|default:"—" }}</td>
+          <td class="text-right">
+            {% if rfq.status == 'PENDING' %}
+            <form method="post" action="{% url 'sales:rfq_delete_item' rfq.pk item.pk %}" class="inline">{% csrf_token %}
+              <button type="submit" onclick="return confirm('Remove this item?');" class="text-red-500 hover:underline text-xs">Remove</button>
+            </form>
+            {% elif item.registered_instrument %}
+            <span class="text-green-600 text-xs">→ {{ item.registered_instrument.asset_tag }}</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-sm text-gray-400">No items added yet.</p>
+    {% endif %}
+
+    {% if rfq.status == 'PENDING' %}
+    <form method="post" action="{% url 'sales:rfq_add_item' rfq.pk %}" class="mt-4 grid grid-cols-1 md:grid-cols-6 gap-2 items-end border-t pt-4">
+      {% csrf_token %}
+      <div class="md:col-span-2"><label class="block text-xs text-gray-500">Description *</label><input type="text" name="description" required class="w-full border border-gray-300 rounded px-2 py-1 text-sm"></div>
+      <div><label class="block text-xs text-gray-500">Manufacturer</label><input type="text" name="manufacturer" class="w-full border border-gray-300 rounded px-2 py-1 text-sm"></div>
+      <div><label class="block text-xs text-gray-500">Model</label><input type="text" name="model_number" class="w-full border border-gray-300 rounded px-2 py-1 text-sm"></div>
+      <div><label class="block text-xs text-gray-500">Serial</label><input type="text" name="serial_number" class="w-full border border-gray-300 rounded px-2 py-1 text-sm"></div>
+      <div><label class="block text-xs text-gray-500">Qty</label><input type="number" name="quantity" value="1" min="1" class="w-full border border-gray-300 rounded px-2 py-1 text-sm"></div>
+      <div class="md:col-span-6 flex justify-end"><button type="submit" class="px-3 py-1.5 bg-blue-700 text-white text-sm rounded hover:bg-blue-600">+ Add Item</button></div>
+    </form>
+    {% endif %}
+  </div>
+
+  <!-- Registered instruments (post-acceptance) -->
+  {% if rfq.status == 'ACCEPTED' or rfq.status == 'READY_FOR_JOBS' %}
+  <div class="bg-white rounded-xl shadow p-6" x-data="{ tab: 'existing' }">
+    <h3 class="font-semibold text-gray-900 border-b pb-2 mb-4">Registered Instruments</h3>
+
+    {% if linked_instruments %}
+    <table class="w-full text-sm mb-4">
+      <thead class="text-left text-gray-500 text-xs uppercase">
+        <tr><th class="py-2">Asset Tag</th><th>Description</th><th>Serial</th><th>Status</th><th class="text-right">Action</th></tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+      {% for instr in linked_instruments %}
+        <tr>
+          <td class="py-2"><a href="{% url 'instruments:instrument_detail' instr.pk %}" class="text-blue-600 hover:underline">{{ instr.asset_tag }}</a></td>
+          <td>{{ instr.description }}</td>
+          <td class="text-gray-500">{{ instr.serial_number }}</td>
+          <td><span class="text-xs px-2 py-0.5 bg-gray-100 rounded">{{ instr.get_status_display }}</span></td>
+          <td class="text-right">
+            {% if rfq.status == 'ACCEPTED' %}
+            <form method="post" action="{% url 'sales:rfq_unlink_instrument' rfq.pk instr.pk %}" class="inline">{% csrf_token %}
+              <button type="submit" onclick="return confirm('Unlink this instrument from the RFQ?');" class="text-red-500 hover:underline text-xs">Unlink</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-sm text-gray-400 mb-4">No instruments registered yet.</p>
+    {% endif %}
+
+    {% if rfq.status == 'ACCEPTED' %}
+    <div class="border-t pt-4">
+      <div class="flex gap-2 mb-3">
+        <button type="button" @click="tab = 'existing'" :class="tab === 'existing' ? 'bg-blue-700 text-white' : 'bg-gray-100 text-gray-700'" class="px-3 py-1.5 text-sm rounded">Pick existing</button>
+        <button type="button" @click="tab = 'new'" :class="tab === 'new' ? 'bg-blue-700 text-white' : 'bg-gray-100 text-gray-700'" class="px-3 py-1.5 text-sm rounded">Register new</button>
+      </div>
+
+      <div x-show="tab === 'existing'">
+        {% if available_instruments %}
+        <form method="post" action="{% url 'sales:rfq_link_instrument' rfq.pk %}" class="flex gap-2 items-end">
+          {% csrf_token %}
+          <div class="flex-1">
+            <label class="block text-xs text-gray-500 mb-1">Existing instrument for {{ rfq.client.name }}</label>
+            <select name="instrument" required class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm">
+              <option value="">— select —</option>
+              {% for instr in available_instruments %}
+              <option value="{{ instr.pk }}">{{ instr.asset_tag }} — {{ instr.description }} (S/N {{ instr.serial_number }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="px-3 py-1.5 bg-blue-700 text-white text-sm rounded hover:bg-blue-600">Link</button>
+        </form>
+        {% else %}
+        <p class="text-sm text-gray-400">No existing instruments for this client. Use "Register new" to create one.</p>
+        {% endif %}
+      </div>
+
+      <div x-show="tab === 'new'" x-cloak>
+        <form method="post" action="{% url 'sales:rfq_create_instrument' rfq.pk %}" class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {% csrf_token %}
+          <div class="md:col-span-2"><label class="block text-xs text-gray-500">Description *</label><input type="text" name="description" required class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"></div>
+          <div><label class="block text-xs text-gray-500">Serial Number *</label><input type="text" name="serial_number" required class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"></div>
+          <div><label class="block text-xs text-gray-500">Manufacturer</label><input type="text" name="manufacturer" class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"></div>
+          <div><label class="block text-xs text-gray-500">Model</label><input type="text" name="model_number" class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"></div>
+          <div>
+            <label class="block text-xs text-gray-500">Category</label>
+            <select name="category" class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm">
+              <option value="">— none —</option>
+              {% for cat in categories %}<option value="{{ cat.pk }}">{{ cat.name }}{% if cat.code %} ({{ cat.code }}){% endif %}</option>{% endfor %}
+            </select>
+          </div>
+          <div><label class="block text-xs text-gray-500">Asset Tag <span class="text-gray-400">(auto if category has a code)</span></label><input type="text" name="asset_tag" class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"></div>
+          <div class="md:col-span-3 flex justify-end"><button type="submit" class="px-3 py-1.5 bg-blue-700 text-white text-sm rounded hover:bg-blue-600">+ Register Instrument</button></div>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- Reject modal -->
+{% if rfq.status == 'PENDING' and can_review %}
+<div id="rejectModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+    <h3 class="text-lg font-semibold text-gray-900 mb-2">Reject RFQ</h3>
+    <p class="text-sm text-gray-500 mb-4">Tell sales why this RFQ doesn't fit the lab's scope of work.</p>
+    <form method="post" action="{% url 'sales:rfq_reject' rfq.pk %}">
+      {% csrf_token %}
+      <textarea name="reason" rows="4" required placeholder="e.g. Out of accredited scope, equipment range exceeds capability."
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"></textarea>
+      <div class="flex justify-end gap-2 mt-4">
+        <button type="button" onclick="document.getElementById('rejectModal').classList.add('hidden')"
+                class="px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50">Cancel</button>
+        <button type="submit" class="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700">Reject RFQ</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

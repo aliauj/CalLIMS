@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}PT Providers — CalLIMS{% endblock %}
+{% block content %}
+<div class="space-y-5">
+  <div class="flex items-center justify-between">
+    <div>
+      <p class="text-xs text-gray-500 uppercase tracking-wide mb-1"><a href="{% url 'proficiency:scheme_list' %}" class="hover:underline">Proficiency Testing</a> / Providers</p>
+      <h2 class="text-2xl font-bold text-gray-900">PT Providers</h2>
+    </div>
+    <a href="{% url 'proficiency:provider_create' %}" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">+ New Provider</a>
+  </div>
+
+  <div class="bg-white rounded-xl shadow overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Code</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Name</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Accreditation Body</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Contact</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Active</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Schemes</th>
+          <th class="px-4 py-3"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for prov in providers %}
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-3 font-mono font-medium text-gray-800">{{ prov.code }}</td>
+          <td class="px-4 py-3 text-gray-800">{{ prov.name }}</td>
+          <td class="px-4 py-3 text-gray-600">{{ prov.accreditation_body|default:"—" }}</td>
+          <td class="px-4 py-3 text-gray-500">
+            {% if prov.contact_email %}<a href="mailto:{{ prov.contact_email }}" class="text-blue-600 hover:underline">{{ prov.contact_email }}</a>{% else %}—{% endif %}
+          </td>
+          <td class="px-4 py-3">
+            {% if prov.is_active %}<span class="text-green-600 font-medium">Yes</span>{% else %}<span class="text-gray-400">No</span>{% endif %}
+          </td>
+          <td class="px-4 py-3 text-gray-600">{{ prov.schemes.count }}</td>
+          <td class="px-4 py-3">
+            <a href="{% url 'proficiency:provider_edit' prov.pk %}" class="text-blue-600 text-xs hover:underline">Edit</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="px-4 py-10 text-center text-gray-400">No providers yet. <a href="{% url 'proficiency:provider_create' %}" class="text-blue-600 hover:underline">Add one</a>.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

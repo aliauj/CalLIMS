@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Jobs — CalLIMS{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="flex justify-between items-center">
+    <h2 class="text-2xl font-bold text-gray-900">Calibration Jobs</h2>
+    <a href="{% url 'workflows:job_create' %}" class="bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">+ New Job</a>
+  </div>
+  <div class="flex gap-2 flex-wrap">
+    <a href="?" class="px-3 py-1 rounded-full text-sm border {% if not status_filter %}bg-blue-800 text-white border-blue-800{% else %}bg-white text-gray-700 border-gray-300 hover:bg-gray-50{% endif %}">All</a>
+    {% for val, label in status_choices %}
+    <a href="?status={{ val }}" class="px-3 py-1 rounded-full text-sm border {% if status_filter == val %}bg-blue-800 text-white border-blue-800{% else %}bg-white text-gray-700 border-gray-300 hover:bg-gray-50{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </div>
+  <div class="bg-white rounded-xl shadow overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Job #</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Asset Tag</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Description</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Method</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Due Date</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Assigned</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for job in jobs %}
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-3"><a href="{% url 'workflows:job_detail' job.pk %}" class="text-blue-600 hover:underline font-medium">{{ job.job_number }}</a></td>
+          <td class="px-4 py-3 font-mono text-xs">{{ job.instrument.asset_tag }}</td>
+          <td class="px-4 py-3">{{ job.instrument.description|truncatechars:40 }}</td>
+          <td class="px-4 py-3">{{ job.method.code }}</td>
+          <td class="px-4 py-3">
+            <span class="px-2 py-1 rounded-full text-xs font-medium
+              {% if job.status == 'completed' %}bg-green-100 text-green-800
+              {% elif job.status == 'review' %}bg-yellow-100 text-yellow-800
+              {% elif job.status == 'cancelled' %}bg-red-100 text-red-800
+              {% else %}bg-blue-100 text-blue-800{% endif %}">
+              {{ job.get_status_display }}
+            </span>
+          </td>
+          <td class="px-4 py-3 text-gray-500">{{ job.due_date|date:"M d, Y"|default:"&mdash;" }}</td>
+          <td class="px-4 py-3">{{ job.assigned_to.get_full_name|default:"&mdash;" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">No jobs found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

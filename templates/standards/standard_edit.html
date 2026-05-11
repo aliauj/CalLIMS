@@ -1,0 +1,361 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ standard.serial_number }} — CalLIMS{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+
+  <div>
+    <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">
+      <a href="{% url 'standards:standard_list' %}" class="hover:underline">Standards</a> /
+      <a href="{% url 'standards:standard_detail' standard.pk %}" class="hover:underline">{{ standard.serial_number }}</a> /
+      Edit
+    </p>
+    <h2 class="text-2xl font-bold text-gray-900">Edit Reference Standard</h2>
+    <p class="text-sm text-gray-500 mt-0.5 font-mono">{{ standard.serial_number }}</p>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+
+    <!-- ── GENERAL INFO ─────────────────────────────────── -->
+    <div class="bg-white rounded-xl shadow p-6 space-y-4 mb-5">
+      <h3 class="font-semibold text-gray-900 border-b pb-2">General Information</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        <div>
+          <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Serial Number</label>
+          <input type="text" value="{{ standard.serial_number }}" disabled
+                 class="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm font-mono text-gray-400 cursor-not-allowed">
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Status <span class="text-red-500">*</span></label>
+          <select name="status" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+            {% for val, label in status_choices %}
+            <option value="{{ val }}" {% if standard.status == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Name <span class="text-red-500">*</span></label>
+          <input type="text" name="name" required value="{{ standard.name }}"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Manufacturer</label>
+          <input type="text" name="manufacturer" value="{{ standard.manufacturer }}"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Model Number</label>
+          <input type="text" name="model_number" value="{{ standard.model_number }}"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Location</label>
+          <input type="text" name="location" value="{{ standard.location }}"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Custodian</label>
+          <select name="custodian" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+            <option value="">— none —</option>
+            {% for s in staff %}
+            <option value="{{ s.pk }}" {% if standard.custodian_id == s.pk %}selected{% endif %}>{{ s.get_full_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Description</label>
+          <textarea name="description" rows="2"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">{{ standard.description }}</textarea>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── UNCERTAINTIES (multi-entry) ───────────────────── -->
+    <div class="bg-white rounded-xl shadow p-6 mb-5"
+         x-data="uncertaintyEditor({{ uncertainties_json }})">
+
+      <div class="flex items-center justify-between border-b pb-2 mb-4">
+        <div>
+          <h3 class="font-semibold text-gray-900">Uncertainties</h3>
+          <p class="text-xs text-gray-400 mt-0.5">Add one row per parameter or measurement range. All values are GUM-compliant.</p>
+        </div>
+        <button type="button" @click="addRow()"
+                class="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+          + Add Uncertainty
+        </button>
+      </div>
+
+      <!-- Hidden JSON input -->
+      <input type="hidden" name="uncertainties_json" :value="JSON.stringify(rows)">
+
+      <!-- Column headers (desktop) -->
+      <div class="hidden md:grid grid-cols-12 gap-2 text-xs font-medium text-gray-400 uppercase tracking-wide px-1 mb-1">
+        <div class="col-span-3">Parameter / Description</div>
+        <div class="col-span-2">Range</div>
+        <div class="col-span-2">u (k=1)</div>
+        <div class="col-span-2">Unit</div>
+        <div class="col-span-1 text-center">k</div>
+        <div class="col-span-1 text-center">CL%</div>
+        <div class="col-span-1"></div>
+      </div>
+
+      <div class="space-y-2">
+        <template x-if="rows.length === 0">
+          <p class="text-sm text-gray-400 text-center py-6 border-2 border-dashed border-gray-200 rounded-lg">
+            No uncertainties defined. Click "+ Add Uncertainty" to start.
+          </p>
+        </template>
+
+        <template x-for="(row, idx) in rows" :key="idx">
+          <div class="grid grid-cols-12 gap-2 items-center bg-gray-50 rounded-lg p-2 border border-gray-200">
+
+            <!-- Parameter -->
+            <div class="col-span-12 md:col-span-3">
+              <input type="text" x-model="row.parameter"
+                     placeholder="e.g. Temperature, DC Voltage 1V"
+                     class="w-full border border-gray-300 rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-blue-500">
+            </div>
+
+            <!-- Range description -->
+            <div class="col-span-12 md:col-span-2">
+              <input type="text" x-model="row.range_description"
+                     placeholder="e.g. 0–100 °C"
+                     class="w-full border border-gray-300 rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-blue-500">
+            </div>
+
+            <!-- u (k=1) -->
+            <div class="col-span-5 md:col-span-2">
+              <input type="number" step="any" x-model="row.uncertainty_value"
+                     placeholder="0.05"
+                     class="w-full border border-gray-300 rounded px-2 py-1.5 text-xs font-mono focus:ring-1 focus:ring-blue-500">
+            </div>
+
+            <!-- Unit -->
+            <div class="col-span-7 md:col-span-2">
+              <select x-model="row.unit_id"
+                      class="w-full border border-gray-300 rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-blue-500">
+                <option value="">— unit —</option>
+                {% regroup units by quantity_type as unit_groups %}
+                {% for group in unit_groups %}
+                <optgroup label="{{ group.grouper }}">
+                  {% for u in group.list %}
+                  <option value="{{ u.pk }}">{{ u.symbol }}</option>
+                  {% endfor %}
+                </optgroup>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- k factor -->
+            <div class="col-span-4 md:col-span-1">
+              <input type="number" step="0.01" min="1" x-model="row.coverage_factor"
+                     placeholder="2"
+                     class="w-full border border-gray-300 rounded px-2 py-1.5 text-xs font-mono text-center focus:ring-1 focus:ring-blue-500">
+            </div>
+
+            <!-- Confidence level -->
+            <div class="col-span-4 md:col-span-1">
+              <input type="number" step="0.01" x-model="row.confidence_level"
+                     placeholder="95.45"
+                     class="w-full border border-gray-300 rounded px-2 py-1.5 text-xs font-mono text-center focus:ring-1 focus:ring-blue-500">
+            </div>
+
+            <!-- Expanded U preview + delete -->
+            <div class="col-span-4 md:col-span-1 flex items-center justify-between gap-1">
+              <span class="text-xs font-mono text-blue-700 whitespace-nowrap"
+                    x-text="row.uncertainty_value && row.coverage_factor ? '±' + (parseFloat(row.uncertainty_value) * parseFloat(row.coverage_factor)).toFixed(6) : ''">
+              </span>
+              <button type="button" @click="rows.splice(idx,1)"
+                      class="text-red-400 hover:text-red-600 text-lg leading-none flex-shrink-0" title="Remove">&#215;</button>
+            </div>
+
+          </div>
+        </template>
+      </div>
+
+      <!-- Notes row (per entry) -->
+      <template x-for="(row, idx) in rows" :key="'notes-' + idx">
+        <div x-show="row._showNotes || row.notes" class="ml-1 mt-1">
+          <input type="text" x-model="row.notes" placeholder="Optional note for this uncertainty entry"
+                 class="w-full border border-gray-200 rounded px-2 py-1 text-xs text-gray-500 focus:ring-1 focus:ring-blue-400">
+        </div>
+      </template>
+
+      <p class="text-xs text-gray-400 mt-3">
+        <strong>U (expanded)</strong> = u × k is shown as a live preview. The first entry is used as the primary uncertainty in calibration calculations unless overridden during data entry.
+      </p>
+
+    </div>
+
+    <!-- ── CALIBRATION CERTIFICATE ────────────────────────── -->
+    <div class="bg-white rounded-xl shadow p-6 space-y-4 mb-5">
+      <h3 class="font-semibold text-gray-900 border-b pb-2">Calibration Certificate</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        <div>
+          <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Calibration Date <span class="text-red-500">*</span></label>
+          <input type="date" name="calibration_date" required
+                 value="{{ standard.calibration_date|date:'Y-m-d' }}"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Calibration Due Date <span class="text-red-500">*</span></label>
+          <input type="date" name="calibration_due_date" required
+                 value="{{ standard.calibration_due_date|date:'Y-m-d' }}"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Calibration Interval (days)</label>
+          <input type="number" name="calibration_interval_days" min="1"
+                 value="{{ standard.calibration_interval_days }}"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Certificate Number</label>
+          <input type="text" name="certificate_number" value="{{ standard.certificate_number }}"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Issued By (external calibration lab)</label>
+          <input type="text" name="issued_by" value="{{ standard.issued_by }}"
+                 placeholder="e.g. National Metrology Institute"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── TRACEABILITY CHAIN ────────────────────────────── -->
+    <div class="bg-white rounded-xl shadow p-6 mb-5"
+         x-data="traceabilityEditor({{ traceability_json }})">
+
+      <div class="flex items-center justify-between border-b pb-2 mb-4">
+        <div>
+          <h3 class="font-semibold text-gray-900">Traceability Chain</h3>
+          <p class="text-xs text-gray-400 mt-0.5">List each calibration link from this standard up to the SI unit / national standard.</p>
+        </div>
+        <button type="button" @click="addLink()"
+                class="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+          + Add Link
+        </button>
+      </div>
+
+      <!-- Hidden input that carries the JSON on submit -->
+      <input type="hidden" name="traceability_chain_json" :value="JSON.stringify(links)">
+
+      <!-- Chain entries -->
+      <div class="space-y-3">
+        <template x-if="links.length === 0">
+          <p class="text-sm text-gray-400 text-center py-4">No traceability links. Click "+ Add Link" to start the chain.</p>
+        </template>
+
+        <template x-for="(link, index) in links" :key="index">
+          <div class="flex gap-3 items-start bg-gray-50 rounded-lg p-3 border border-gray-200">
+
+            <div class="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold mt-1"
+                 x-text="index + 1"></div>
+
+            <div class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div class="md:col-span-1">
+                <label class="block text-xs text-gray-500 mb-0.5">Issuing Body <span class="text-red-400">*</span></label>
+                <input type="text" x-model="link.issuing_body"
+                       placeholder="e.g. BIPM, PTB, SANAS, NMI"
+                       class="w-full border border-gray-300 rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-blue-500">
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-0.5">Certificate / Report No.</label>
+                <input type="text" x-model="link.cert_number"
+                       placeholder="e.g. PTB-2024-001"
+                       class="w-full border border-gray-300 rounded px-2 py-1.5 text-xs font-mono focus:ring-1 focus:ring-blue-500">
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-0.5">Date</label>
+                <input type="date" x-model="link.date"
+                       class="w-full border border-gray-300 rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-blue-500">
+              </div>
+            </div>
+
+            <button type="button" @click="removeLink(index)"
+                    class="flex-shrink-0 text-red-400 hover:text-red-600 mt-1 text-lg leading-none"
+                    title="Remove">&#215;</button>
+          </div>
+        </template>
+      </div>
+
+      <!-- SI anchor note -->
+      <p x-show="links.length > 0" class="text-xs text-gray-400 mt-3">
+        The last entry should represent the link to the SI unit or national primary standard.
+      </p>
+
+    </div>
+
+    <!-- ── NOTES ─────────────────────────────────────────── -->
+    <div class="bg-white rounded-xl shadow p-6 mb-5">
+      <h3 class="font-semibold text-gray-900 border-b pb-2 mb-4">Internal Notes</h3>
+      <textarea name="notes" rows="3" placeholder="Any internal remarks not shown on the certificate…"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">{{ standard.notes }}</textarea>
+    </div>
+
+    <div class="flex gap-3">
+      <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
+        Save Changes
+      </button>
+      <a href="{% url 'standards:standard_detail' standard.pk %}"
+         class="px-6 py-2.5 border border-gray-300 text-sm rounded-lg text-gray-700 hover:bg-gray-50">
+        Cancel
+      </a>
+    </div>
+
+  </form>
+</div>
+
+<script>
+function uncertaintyEditor(initial) {
+  return {
+    rows: Array.isArray(initial) ? initial.map(r => ({
+      parameter: r.parameter || '',
+      range_description: r.range_description || '',
+      uncertainty_value: r.uncertainty_value || '',
+      coverage_factor: r.coverage_factor || '2',
+      unit_id: String(r.unit_id || ''),
+      confidence_level: r.confidence_level || '95.45',
+      notes: r.notes || '',
+      _showNotes: !!(r.notes),
+    })) : [],
+    addRow() {
+      this.rows.push({
+        parameter: '', range_description: '',
+        uncertainty_value: '', coverage_factor: '2',
+        unit_id: '', confidence_level: '95.45',
+        notes: '', _showNotes: false,
+      });
+    },
+  }
+}
+
+function traceabilityEditor(initial) {
+  return {
+    links: Array.isArray(initial) ? initial : [],
+    addLink() {
+      this.links.push({ issuing_body: '', cert_number: '', date: '' });
+    },
+    removeLink(index) {
+      this.links.splice(index, 1);
+    }
+  }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Notifications — CalLIMS{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-4">
+
+  <div class="flex items-center justify-between">
+    <h2 class="text-2xl font-bold text-gray-900">Notifications
+      {% if unread_count %}<span class="ml-2 text-sm font-normal bg-red-100 text-red-700 px-2 py-0.5 rounded-full">{{ unread_count }} unread</span>{% endif %}
+    </h2>
+    {% if unread_count %}
+    <form method="post" action="{% url 'notifications:mark_all_read' %}">
+      {% csrf_token %}
+      <button type="submit" class="text-sm text-blue-600 hover:text-blue-800 hover:underline">Mark all as read</button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% if notifications %}
+  <div class="bg-white rounded-xl shadow divide-y divide-gray-100">
+    {% for notif in notifications %}
+    <div class="px-5 py-4 flex items-start gap-4 {% if not notif.is_read %}bg-blue-50{% endif %}">
+
+      <!-- Icon -->
+      <div class="mt-0.5 shrink-0">
+        {% if notif.notification_type == 'JOB_REVIEW' %}
+        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-yellow-100 text-yellow-600 text-sm">&#128065;</span>
+        {% elif notif.notification_type == 'JOB_REJECTED' %}
+        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-600 text-sm">&#10005;</span>
+        {% elif notif.notification_type == 'JOB_APPROVED' %}
+        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-600 text-sm">&#10003;</span>
+        {% elif notif.notification_type == 'CERT_ISSUED' %}
+        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-600 text-sm">&#128196;</span>
+        {% elif notif.notification_type == 'CAL_OVERDUE' %}
+        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-600 text-sm">&#9888;</span>
+        {% elif notif.notification_type == 'STD_EXPIRING' %}
+        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-orange-100 text-orange-600 text-sm">&#8987;</span>
+        {% else %}
+        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-500 text-sm">&#8226;</span>
+        {% endif %}
+      </div>
+
+      <!-- Content -->
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-semibold text-gray-900">{{ notif.title }}</p>
+        <p class="text-sm text-gray-600 mt-0.5 whitespace-pre-line">{{ notif.message }}</p>
+        <p class="text-xs text-gray-400 mt-1">{{ notif.created_at|date:"M d, Y H:i" }}</p>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex items-center gap-2 shrink-0">
+        {% if not notif.is_read %}
+        <form method="post" action="{% url 'notifications:mark_read' notif.pk %}">
+          {% csrf_token %}
+          {% if notif.link %}<input type="hidden" name="next" value="{{ notif.link }}">{% endif %}
+          <button type="submit" class="text-xs text-blue-600 hover:underline whitespace-nowrap">Mark read{% if notif.link %} &amp; open{% endif %}</button>
+        </form>
+        {% elif notif.link %}
+        <a href="{{ notif.link }}" class="text-xs text-blue-600 hover:underline whitespace-nowrap">Open &rarr;</a>
+        {% endif %}
+      </div>
+
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="bg-white rounded-xl shadow p-12 text-center text-gray-400">
+    <p class="text-4xl mb-3">&#128276;</p>
+    <p class="text-sm">You have no notifications.</p>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

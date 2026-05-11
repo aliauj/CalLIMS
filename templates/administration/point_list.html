@@ -1,0 +1,61 @@
+{% extends "administration/base_admin.html" %}
+{% block title %}Calibration Points — {{ method.code }}{% endblock %}
+{% block content %}
+<div class="space-y-5">
+  <div class="flex items-center justify-between">
+    <div>
+      <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">
+        <a href="{% url 'administration:method_list' %}" class="hover:underline">Methods</a> / {{ method.code }} / Points
+      </p>
+      <h2 class="text-xl font-bold text-gray-900">Calibration Points</h2>
+      <p class="text-sm text-gray-500 mt-0.5">{{ method.name }} — defines the test points for data entry</p>
+    </div>
+    <a href="{% url 'administration:point_create' method_pk=method.pk %}" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">+ Add Point</a>
+  </div>
+
+  <div class="bg-white rounded-xl shadow overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">#</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Label</th>
+          <th class="px-4 py-3 text-right font-medium text-gray-600">Nominal Value</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Unit</th>
+          <th class="px-4 py-3 text-right font-medium text-gray-600">Tolerance (+)</th>
+          <th class="px-4 py-3 text-right font-medium text-gray-600">Tolerance (−)</th>
+          <th class="px-4 py-3 text-center font-medium text-gray-600">Readings</th>
+          <th class="px-4 py-3"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for pt in points %}
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-3 font-mono text-gray-500">{{ pt.sequence }}</td>
+          <td class="px-4 py-3 font-medium text-gray-800">{{ pt.label }}</td>
+          <td class="px-4 py-3 text-right font-mono text-gray-700">{{ pt.nominal_value }}</td>
+          <td class="px-4 py-3 text-gray-600">{{ pt.unit.symbol }}</td>
+          <td class="px-4 py-3 text-right font-mono text-gray-500">{{ pt.tolerance_positive|default:"—" }}</td>
+          <td class="px-4 py-3 text-right font-mono text-gray-500">{{ pt.tolerance_negative|default:"—" }}</td>
+          <td class="px-4 py-3 text-center text-gray-600">{{ pt.num_readings }}</td>
+          <td class="px-4 py-3 flex gap-3">
+            <a href="{% url 'administration:point_edit' pt.pk %}" class="text-blue-600 text-xs hover:underline">Edit</a>
+            <form method="post" action="{% url 'administration:point_delete' pt.pk %}"
+                  onsubmit="return confirm('Delete point {{ pt.label }}?')">
+              {% csrf_token %}
+              <button type="submit" class="text-red-500 text-xs hover:underline">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="8" class="px-4 py-10 text-center text-gray-400">
+            No calibration points defined.
+            <a href="{% url 'administration:point_create' method_pk=method.pk %}" class="text-blue-600 hover:underline">Add the first one</a>.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

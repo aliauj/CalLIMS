@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}{{ instrument.asset_tag }} — CalLIMS{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <div class="flex justify-between items-start">
+    <div>
+      <h2 class="text-2xl font-bold text-gray-900 font-mono">{{ instrument.asset_tag }}</h2>
+      <p class="text-gray-500 mt-1">{{ instrument.description }}</p>
+    </div>
+    <div class="flex items-center gap-3 flex-wrap">
+      {% if not user.is_client %}
+      <a href="{% url 'instruments:instrument_edit' instrument.pk %}"
+         class="text-xs px-3 py-1.5 bg-blue-700 text-white rounded-lg hover:bg-blue-800">&#9998; Edit</a>
+      {% endif %}
+      <div class="flex gap-2">
+        <a href="{% url 'instruments:sticker_pdf' instrument.pk %}?size=small" target="_blank" class="text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700">Small Sticker</a>
+        <a href="{% url 'instruments:sticker_pdf' instrument.pk %}?size=medium" target="_blank" class="text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700">Medium Sticker</a>
+        <a href="{% url 'instruments:sticker_pdf' instrument.pk %}?size=large" target="_blank" class="text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700">Large Sticker</a>
+      </div>
+      <span class="px-3 py-1 rounded-full text-sm font-medium
+      {% if instrument.status == 'CALIBRATED' %}bg-green-100 text-green-800
+      {% elif instrument.status == 'ACTIVE' %}bg-blue-100 text-blue-800
+      {% elif instrument.status == 'OUT_OF_SERVICE' %}bg-red-100 text-red-800
+      {% elif instrument.status == 'IN_CALIBRATION' %}bg-yellow-100 text-yellow-800
+      {% else %}bg-gray-100 text-gray-700{% endif %}">
+      {{ instrument.get_status_display }}
+    </span>
+    </div><!-- /flex items-center gap-3 -->
+  </div><!-- /flex justify-between -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="bg-white rounded-xl shadow p-6">
+      <h3 class="font-semibold text-gray-900 border-b pb-2 mb-4">Specifications</h3>
+      <dl class="grid grid-cols-2 gap-y-3 text-sm">
+        <dt class="text-gray-500">Instrument Tag</dt><dd class="font-mono font-semibold">{{ instrument.asset_tag }}</dd>
+        <dt class="text-gray-500">Serial #</dt><dd class="font-mono">{{ instrument.serial_number }}</dd>
+        <dt class="text-gray-500">Manufacturer</dt><dd>{{ instrument.manufacturer|default:"&mdash;" }}</dd>
+        <dt class="text-gray-500">Model</dt><dd>{{ instrument.model_number|default:"&mdash;" }}</dd>
+        <dt class="text-gray-500">Category</dt><dd>{{ instrument.category|default:"&mdash;" }}</dd>
+        <dt class="text-gray-500">Client</dt><dd>{{ instrument.client|default:"Internal" }}</dd>
+        <dt class="text-gray-500">Location</dt><dd>{{ instrument.location|default:"&mdash;" }}</dd>
+        <dt class="text-gray-500">Cal. Interval</dt><dd>{{ instrument.calibration_interval_days }} days</dd>
+        <dt class="text-gray-500">Last Calibrated</dt><dd>{{ instrument.last_calibration_date|date:"M d, Y"|default:"&mdash;" }}</dd>
+        <dt class="text-gray-500">Next Due</dt>
+        <dd class="{% if instrument.is_overdue %}text-red-600 font-semibold{% endif %}">
+          {{ instrument.next_calibration_date|date:"M d, Y"|default:"Not scheduled" }}
+          {% if instrument.is_overdue %}<span class="text-red-500 text-xs ml-1">OVERDUE</span>{% endif %}
+        </dd>
+      </dl>
+    </div>
+    <div class="bg-white rounded-xl shadow p-6">
+      <h3 class="font-semibold text-gray-900 border-b pb-2 mb-4">Calibration History</h3>
+      <div class="space-y-2 text-sm">
+        {% for job in jobs %}
+        <div class="flex justify-between items-center py-2 border-b border-gray-50 last:border-0">
+          <a href="{% url 'workflows:job_detail' job.pk %}" class="text-blue-600 hover:underline font-medium">{{ job.job_number }}</a>
+          <span class="text-gray-400">{{ job.received_date|date:"M d, Y" }}</span>
+          <span class="px-2 py-0.5 rounded-full text-xs {% if job.status == 'completed' %}bg-green-100 text-green-700{% else %}bg-gray-100 text-gray-600{% endif %}">{{ job.get_status_display }}</span>
+        </div>
+        {% empty %}
+        <p class="text-gray-400 py-4 text-center">No calibration history yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

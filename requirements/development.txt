@@ -1,0 +1,5 @@
+-r base.txt
+django-debug-toolbar>=4.2
+ipython>=8.0
+factory-boy>=3.3
+coverage>=7.3

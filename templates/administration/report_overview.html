@@ -1,0 +1,283 @@
+{% extends "administration/base_admin.html" %}
+{% block title %}Reports & Analytics — CalLIMS{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<div class="space-y-6">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between flex-wrap gap-3">
+    <h2 class="text-2xl font-bold text-gray-900">Reports &amp; Analytics</h2>
+    <div class="flex gap-2">
+      <a href="{% url 'administration:report_jobs_export' %}"
+         class="bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-600">
+        &#8595; Export Jobs CSV
+      </a>
+      <a href="{% url 'administration:report_instruments_export' %}"
+         class="bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
+        &#8595; Export Instruments CSV
+      </a>
+    </div>
+  </div>
+
+  <!-- KPI row -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="bg-white rounded-xl shadow p-5 border-l-4 border-blue-500">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Total Jobs</p>
+      <p class="text-3xl font-bold text-blue-700 mt-1">{{ total_jobs }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow p-5 border-l-4 border-green-500">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Certificates Issued</p>
+      <p class="text-3xl font-bold text-green-700 mt-1">{{ total_certs }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow p-5 border-l-4 border-red-500">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Overdue Instruments</p>
+      <p class="text-3xl font-bold text-red-600 mt-1">{{ overdue_count }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow p-5 border-l-4 border-orange-500">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Standards Expiring (30d)</p>
+      <p class="text-3xl font-bold text-orange-600 mt-1">{{ expiring_count }}</p>
+    </div>
+  </div>
+
+  <!-- Charts row -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- Job activity chart (2/3 width) -->
+    <div class="lg:col-span-2 bg-white rounded-xl shadow p-6">
+      <h3 class="font-semibold text-gray-900 mb-4">Job &amp; Certificate Activity (12 months)</h3>
+      <canvas id="activityChart" height="120"></canvas>
+    </div>
+
+    <!-- Jobs by status (1/3 width) -->
+    <div class="bg-white rounded-xl shadow p-6">
+      <h3 class="font-semibold text-gray-900 mb-4">Jobs by Status</h3>
+      <canvas id="statusChart" height="200"></canvas>
+      <div class="mt-4 space-y-1">
+        {% for status, count in jobs_by_status.items %}
+        <div class="flex items-center justify-between text-sm">
+          <span class="text-gray-600 capitalize">{{ status|title }}</span>
+          <span class="font-semibold text-gray-900">{{ count }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Overdue instruments -->
+  {% if overdue_instruments %}
+  <div class="bg-white rounded-xl shadow overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <h3 class="font-semibold text-gray-900">Overdue Instruments</h3>
+      <span class="text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded-full">{{ overdue_count }} overdue</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-4 py-3 text-left font-medium text-gray-600">Instrument Tag</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600">Description</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600">Client</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600">Due Date</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for instr in overdue_instruments %}
+          <tr class="bg-red-50 hover:bg-red-100">
+            <td class="px-4 py-3 font-mono">
+              <a href="{% url 'instruments:instrument_detail' instr.pk %}" class="text-blue-600 hover:underline">{{ instr.asset_tag }}</a>
+            </td>
+            <td class="px-4 py-3">{{ instr.description }}</td>
+            <td class="px-4 py-3 text-gray-600">{{ instr.client|default:"Internal" }}</td>
+            <td class="px-4 py-3 text-red-600 font-semibold">{{ instr.next_calibration_date|date:"M d, Y" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Expiring standards -->
+  {% if expiring_standards %}
+  <div class="bg-white rounded-xl shadow overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <h3 class="font-semibold text-gray-900">Reference Standards Expiring Within 30 Days</h3>
+      <span class="text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">{{ expiring_count }} expiring</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-4 py-3 text-left font-medium text-gray-600">Standard</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600">Certificate #</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600">Expiry Date</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for std in expiring_standards %}
+          <tr class="hover:bg-orange-50">
+            <td class="px-4 py-3">
+              <a href="{% url 'standards:standard_detail' std.pk %}" class="text-blue-600 hover:underline">{{ std.name }}</a>
+            </td>
+            <td class="px-4 py-3 font-mono text-xs text-gray-600">{{ std.certificate_number|default:"—" }}</td>
+            <td class="px-4 py-3 font-semibold text-orange-700">{{ std.calibration_due_date|date:"M d, Y" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Customer NCR section -->
+  <div class="bg-white rounded-xl shadow overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
+      <h3 class="font-semibold text-gray-900">Customer Complaints (NCRs)
+        <span class="ml-2 text-sm font-normal text-gray-500">{{ customer_ncs|length }} total</span>
+      </h3>
+      <div class="flex items-center gap-4 text-sm flex-wrap">
+        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span>Return for Recalibration: <strong>{{ nc_resolution_counts.RETURN_RECALIBRATE }}</strong></span>
+        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-green-500 inline-block"></span>Accept / Use As-Is: <strong>{{ nc_resolution_counts.USE_AS_IS }}</strong></span>
+        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block"></span>Correct &amp; Reissue: <strong>{{ nc_resolution_counts.CORRECT_REISSUE }}</strong></span>
+        {% if nc_resolution_counts.pending %}<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-gray-400 inline-block"></span>Pending: <strong>{{ nc_resolution_counts.pending }}</strong></span>{% endif %}
+      </div>
+    </div>
+
+    {% if customer_ncs %}
+    <!-- Resolution summary pills -->
+    <div class="px-6 py-3 bg-gray-50 border-b border-gray-100 flex flex-wrap gap-3">
+      <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">&#128259; Return for Recalibration: {{ nc_resolution_counts.RETURN_RECALIBRATE }}</span>
+      <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">&#10003; Accept / Use As-Is: {{ nc_resolution_counts.USE_AS_IS }}</span>
+      <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">&#128196; Correct &amp; Reissue: {{ nc_resolution_counts.CORRECT_REISSUE }}</span>
+      {% if nc_resolution_counts.pending %}<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-700">&#8987; Pending: {{ nc_resolution_counts.pending }}</span>{% endif %}
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-4 py-3 text-left font-medium text-gray-600">NC #</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600">Title</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600">Customer</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600">Via</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600">Certificate</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600">Severity</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600">Resolution Action</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600">Detected</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for nc in customer_ncs %}
+          <tr class="hover:bg-orange-50">
+            <td class="px-4 py-3 font-mono text-xs">
+              <a href="{% url 'nonconformance:nc_detail' nc.pk %}" class="text-blue-600 hover:underline">{{ nc.nc_number }}</a>
+            </td>
+            <td class="px-4 py-3 font-medium text-gray-800">{{ nc.title|truncatechars:40 }}</td>
+            <td class="px-4 py-3 text-sm text-gray-700">{{ nc.customer|default:"—" }}</td>
+            <td class="px-4 py-3">
+              {% if nc.complaint_channel == 'EMAIL' %}<span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">&#9993; Email</span>
+              {% elif nc.complaint_channel == 'PHONE' %}<span class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800">&#128222; Phone</span>
+              {% else %}<span class="text-xs text-gray-400">—</span>{% endif %}
+            </td>
+            <td class="px-4 py-3 text-xs font-mono text-gray-500">
+              {% if nc.certificate %}<a href="{% url 'certificates:certificate_detail' nc.certificate.pk %}" class="text-blue-600 hover:underline">{{ nc.certificate.certificate_number }}</a>
+              {% elif nc.job %}{{ nc.job.instrument.asset_tag }}{% else %}—{% endif %}
+            </td>
+            <td class="px-4 py-3">
+              <span class="px-2 py-0.5 rounded text-xs font-medium
+                {% if nc.severity == 'CRITICAL' %}bg-red-100 text-red-800
+                {% elif nc.severity == 'MAJOR' %}bg-orange-100 text-orange-800
+                {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                {{ nc.get_severity_display }}
+              </span>
+            </td>
+            <td class="px-4 py-3">
+              {% if nc.customer_resolution == 'RETURN_RECALIBRATE' %}
+              <span class="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">&#128259; Return for Recalibration</span>
+              {% elif nc.customer_resolution == 'USE_AS_IS' %}
+              <span class="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">&#10003; Accept / Use As-Is</span>
+              {% elif nc.customer_resolution == 'CORRECT_REISSUE' %}
+              <span class="px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">&#128196; Correct &amp; Reissue</span>
+              {% else %}
+              <span class="text-xs text-gray-400 italic">Pending</span>
+              {% endif %}
+            </td>
+            <td class="px-4 py-3">
+              <span class="px-2 py-0.5 rounded text-xs font-medium
+                {% if nc.status == 'CLOSED' %}bg-green-100 text-green-800
+                {% elif nc.status == 'AWAITING_VERIFICATION' %}bg-blue-100 text-blue-800
+                {% elif nc.status == 'INVESTIGATING' %}bg-purple-100 text-purple-800
+                {% else %}bg-red-100 text-red-800{% endif %}">
+                {{ nc.get_status_display }}
+              </span>
+            </td>
+            <td class="px-4 py-3 text-xs text-gray-500">{{ nc.detected_date|date:"M d, Y" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="px-6 py-8 text-sm text-gray-400 text-center">No customer complaints recorded yet.</p>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const labels = {{ month_labels|safe }};
+  const jobData = {{ jobs_series|safe }};
+  const certData = {{ certs_series|safe }};
+  const statusData = {{ jobs_by_status_json|safe }};
+
+  new Chart(document.getElementById('activityChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Jobs Created',
+          data: jobData,
+          backgroundColor: 'rgba(59,130,246,0.7)',
+          borderColor: 'rgb(59,130,246)',
+          borderWidth: 1,
+          borderRadius: 3,
+        },
+        {
+          label: 'Certificates Issued',
+          data: certData,
+          backgroundColor: 'rgba(16,185,129,0.7)',
+          borderColor: 'rgb(16,185,129)',
+          borderWidth: 1,
+          borderRadius: 3,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'bottom' } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+    },
+  });
+
+  const statusLabels = Object.keys(statusData).map(s => s.charAt(0).toUpperCase() + s.slice(1));
+  const statusValues = Object.values(statusData);
+  const palette = ['#3b82f6','#f59e0b','#10b981','#8b5cf6','#ef4444','#6b7280','#f97316'];
+  new Chart(document.getElementById('statusChart'), {
+    type: 'doughnut',
+    data: {
+      labels: statusLabels,
+      datasets: [{ data: statusValues, backgroundColor: palette.slice(0, statusLabels.length), borderWidth: 2 }],
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      cutout: '65%',
+    },
+  });
+});
+</script>
+{% endblock %}

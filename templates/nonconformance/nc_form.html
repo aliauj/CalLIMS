@@ -1,0 +1,339 @@
+{% extends "base.html" %}
+{% block title %}{{ action }} Nonconformance — CalLIMS{% endblock %}
+
+{% block extra_head %}
+<script>
+const CERTS_BY_CLIENT = {{ certs_by_client_json|safe }};
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-6">
+
+  <div>
+    <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">
+      <a href="{% url 'nonconformance:nc_list' %}" class="hover:underline">Nonconformances</a> /
+      {% if nc %}
+        <a href="{% url 'nonconformance:nc_detail' nc.pk %}" class="hover:underline">{{ nc.nc_number }}</a> / Edit
+      {% else %}Raise New NC
+      {% endif %}
+    </p>
+    <h2 class="text-2xl font-bold text-gray-900">{{ action }} Nonconformance</h2>
+  </div>
+
+  {% if messages %}
+  {% for m in messages %}
+  <div class="px-4 py-3 rounded-lg text-sm bg-red-50 text-red-800 border border-red-200">{{ m }}</div>
+  {% endfor %}
+  {% endif %}
+
+  <!-- Certificate trigger context banner -->
+  {% if cert %}
+  <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
+    <p class="font-semibold mb-1">Raised from Certificate {{ cert.certificate_number }}</p>
+    <p>Instrument: {{ cert.job.instrument }}
+      &nbsp;&bull;&nbsp; Job: {{ cert.job.job_number }}
+      {% if cert.job.assigned_to %}&nbsp;&bull;&nbsp; Technician: {{ cert.job.assigned_to.get_full_name }}{% endif %}
+    </p>
+  </div>
+  {% endif %}
+
+  <form method="post" class="bg-white rounded-xl shadow p-6 space-y-5"
+        x-data="{
+          source: '{% if nc %}{{ nc.source }}{% else %}{{ initial_source }}{% endif %}',
+          clientId: '{% if nc and nc.customer_id %}{{ nc.customer_id }}{% endif %}',
+          certPk: '{% if nc and nc.certificate_id %}{{ nc.certificate_id }}{% elif initial_cert_id %}{{ initial_cert_id }}{% endif %}',
+          certSearch: '{% if nc and nc.certificate %}{{ nc.certificate.certificate_number }}{% elif cert %}{{ cert.certificate_number }}{% endif %}',
+          showCertDrop: false,
+          get filteredCerts() {
+            const list = CERTS_BY_CLIENT[this.clientId] || [];
+            const q = this.certSearch.toLowerCase();
+            if (!q) return list;
+            return list.filter(c =>
+              c.cert_number.toLowerCase().includes(q) ||
+              c.instrument.toLowerCase().includes(q)
+            );
+          },
+          selectCert(cert) {
+            this.certPk = cert.pk;
+            this.certSearch = cert.cert_number + ' — ' + cert.instrument;
+            this.showCertDrop = false;
+          },
+          clearCert() {
+            this.certPk = '';
+            this.certSearch = '';
+          },
+          onClientChange() {
+            this.certPk = '';
+            this.certSearch = '';
+          }
+        }" @click.away="showCertDrop = false">
+    {% csrf_token %}
+
+    <!-- Hidden cert / job / technician IDs -->
+    {% if initial_cert_id and not nc %}
+    <input type="hidden" name="_certificate_pk" value="{{ initial_cert_id }}">
+    <input type="hidden" name="job_id" value="{{ initial_job_id }}">
+    <input type="hidden" name="technician_id" value="{{ initial_tech_id }}">
+    {% elif nc %}
+      {% if nc.job %}<input type="hidden" name="job_id" value="{{ nc.job.pk }}">{% endif %}
+      {% if nc.technician %}<input type="hidden" name="technician_id" value="{{ nc.technician.pk }}">{% endif %}
+    {% endif %}
+    <!-- Reactive hidden: certificate_id driven by Alpine -->
+    <input type="hidden" name="certificate_id" :value="certPk">
+
+    <!-- Title -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">
+        Title <span class="text-red-500">*</span>
+      </label>
+      <input type="text" name="title" required maxlength="255"
+             value="{% if nc %}{{ nc.title }}{% else %}{{ initial_title }}{% endif %}"
+             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+             placeholder="Brief description of the nonconformance">
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+      <!-- Source -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          Source <span class="text-red-500">*</span>
+        </label>
+        <select name="source" required x-model="source"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+          {% for val, label in source_choices %}
+          <option value="{{ val }}"
+            {% if nc and nc.source == val %}selected
+            {% elif not nc and initial_source == val %}selected{% endif %}>
+            {{ label }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Severity -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          Severity <span class="text-red-500">*</span>
+        </label>
+        <select name="severity" required
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+          {% for val, label in severity_choices %}
+          <option value="{{ val }}"
+            {% if nc and nc.severity == val %}selected
+            {% elif not nc and val == 'MINOR' %}selected{% endif %}>
+            {{ label }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Status (edit only) -->
+      {% if nc %}
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+        <select name="status"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+          {% for val, label in status_choices %}
+          <option value="{{ val }}" {% if nc.status == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+
+      <!-- Detected Date -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          Detected Date <span class="text-red-500">*</span>
+        </label>
+        <input type="date" name="detected_date" required
+               value="{% if nc %}{{ nc.detected_date|date:'Y-m-d' }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+      </div>
+
+      <!-- Target Closure Date -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Target Closure Date</label>
+        <input type="date" name="target_closure_date"
+               value="{% if nc and nc.target_closure_date %}{{ nc.target_closure_date|date:'Y-m-d' }}{% endif %}"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+      </div>
+
+    </div>
+
+    <!-- ── CUSTOMER COMPLAINT SECTION ─────────────────────────────── -->
+    <div x-show="source === 'CUSTOMER_COMPLAINT'" x-cloak
+         class="border border-orange-200 rounded-xl bg-orange-50 p-5 space-y-4">
+
+      <p class="text-xs font-semibold uppercase tracking-widest text-orange-600">Customer Complaint Details</p>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        <!-- Customer -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Customer <span class="text-red-500">*</span>
+          </label>
+          <select name="customer_id"
+                  x-model="clientId"
+                  @change="onClientChange()"
+                  :required="source === 'CUSTOMER_COMPLAINT'"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 bg-white">
+            <option value="">— Select customer —</option>
+            {% for client in clients %}
+            <option value="{{ client.pk }}"
+              {% if nc and nc.customer_id == client.pk %}selected{% endif %}>
+              {{ client.name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Complaint channel -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Received Via <span class="text-red-500">*</span>
+          </label>
+          <div class="flex gap-4 mt-2.5">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="complaint_channel" value="EMAIL"
+                     {% if nc and nc.complaint_channel == 'EMAIL' %}checked{% endif %}
+                     class="text-blue-600 focus:ring-blue-500">
+              <span class="text-sm text-gray-700">&#9993; Email</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="complaint_channel" value="PHONE"
+                     {% if nc and nc.complaint_channel == 'PHONE' %}checked{% endif %}
+                     class="text-blue-600 focus:ring-blue-500">
+              <span class="text-sm text-gray-700">&#128222; Phone</span>
+            </label>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Certificate autocomplete -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          Related Certificate
+          <span class="text-xs font-normal text-gray-500 ml-1">(select customer first)</span>
+        </label>
+        <div class="relative">
+          <div class="flex gap-2">
+            <div class="relative flex-1">
+              <input type="text"
+                     x-model="certSearch"
+                     @focus="showCertDrop = true"
+                     @input="showCertDrop = true"
+                     :disabled="!clientId"
+                     :placeholder="clientId ? 'Type certificate # or instrument...' : 'Select a customer first'"
+                     class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed pr-8">
+              <!-- Clear button -->
+              <button type="button" x-show="certPk" @click="clearCert()"
+                      class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none">
+                &times;
+              </button>
+            </div>
+          </div>
+
+          <!-- Dropdown list -->
+          <div x-show="showCertDrop && clientId && filteredCerts.length > 0" x-cloak
+               class="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
+            <template x-for="cert in filteredCerts" :key="cert.pk">
+              <button type="button"
+                      @click="selectCert(cert)"
+                      class="w-full text-left px-4 py-2.5 hover:bg-blue-50 border-b border-gray-50 last:border-0">
+                <span class="font-mono text-xs font-semibold text-blue-700" x-text="cert.cert_number"></span>
+                <span class="text-xs text-gray-500 ml-2" x-text="cert.instrument"></span>
+              </button>
+            </template>
+          </div>
+
+          <!-- No results message -->
+          <div x-show="showCertDrop && clientId && certSearch.length > 0 && filteredCerts.length === 0" x-cloak
+               class="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg px-4 py-3 text-sm text-gray-400 text-center">
+            No certificates found for this customer.
+          </div>
+        </div>
+        <!-- Indicator when a cert is selected -->
+        <p x-show="certPk" x-cloak class="text-xs text-green-700 mt-1">&#10003; Certificate selected</p>
+      </div>
+
+      <!-- Customer Resolution -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          Resolution Action <span class="text-red-500">*</span>
+        </label>
+        <select name="customer_resolution"
+                :required="source === 'CUSTOMER_COMPLAINT'"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 bg-white">
+          <option value="">— Select the action taken —</option>
+          {% for val, label in customer_resolution_choices %}
+          <option value="{{ val }}"
+            {% if nc and nc.customer_resolution == val %}selected{% endif %}>
+            {{ label }}
+          </option>
+          {% endfor %}
+        </select>
+        <p class="text-xs text-gray-500 mt-1">What action was taken in response to this customer complaint?</p>
+      </div>
+
+    </div>
+    <!-- ── END CUSTOMER COMPLAINT SECTION ─────────────────────────── -->
+
+    <!-- Description -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">
+        Description <span class="text-red-500">*</span>
+      </label>
+      <textarea name="description" rows="4" required
+                placeholder="What was found? What happened? Include any measurements or observations."
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">{% if nc %}{{ nc.description }}{% endif %}</textarea>
+    </div>
+
+    <!-- Immediate Action -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Immediate Action Taken</label>
+      <textarea name="immediate_action" rows="3"
+                placeholder="What was done immediately to contain or mitigate the issue?"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">{% if nc %}{{ nc.immediate_action }}{% endif %}</textarea>
+    </div>
+
+    <!-- Root Cause + Technician override (edit only) -->
+    {% if nc %}
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Root Cause</label>
+      <textarea name="root_cause" rows="3"
+                placeholder="Root cause identified during investigation…"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">{{ nc.root_cause }}</textarea>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Technician (Calibration Performer)</label>
+      <select name="technician_id"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+        <option value="">— none —</option>
+        {% for s in staff %}
+        <option value="{{ s.pk }}" {% if nc.technician_id == s.pk %}selected{% endif %}>
+          {{ s.get_full_name }} ({{ s.get_role_display }})
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+
+    <div class="flex gap-3 pt-2">
+      <button type="submit"
+              class="px-6 py-2.5 bg-red-700 text-white text-sm font-medium rounded-lg hover:bg-red-800">
+        {% if nc %}Save Changes{% else %}Raise Nonconformance{% endif %}
+      </button>
+      <a href="{% if nc %}{% url 'nonconformance:nc_detail' nc.pk %}{% elif cert %}{% url 'certificates:certificate_detail' cert.pk %}{% else %}{% url 'nonconformance:nc_list' %}{% endif %}"
+         class="px-6 py-2.5 border border-gray-300 text-sm rounded-lg text-gray-700 hover:bg-gray-50">
+        Cancel
+      </a>
+    </div>
+
+  </form>
+</div>
+{% endblock %}

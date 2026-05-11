@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Proficiency Testing — CalLIMS{% endblock %}
+{% block content %}
+<div class="space-y-5">
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-2xl font-bold text-gray-900">Proficiency Testing</h2>
+      <p class="text-sm text-gray-500 mt-0.5">ISO/IEC 17025 inter-laboratory comparison schemes</p>
+    </div>
+    <div class="flex gap-2">
+      <a href="{% url 'proficiency:provider_list' %}" class="px-4 py-2 border border-gray-300 text-sm rounded-lg text-gray-700 hover:bg-gray-50">Providers</a>
+      <a href="{% url 'proficiency:scheme_create' %}" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">+ New Scheme</a>
+    </div>
+  </div>
+
+  <!-- Status filter -->
+  <div class="flex gap-2 flex-wrap">
+    <a href="?" class="px-3 py-1.5 text-xs rounded-full border {% if not status_filter %}bg-blue-600 text-white border-blue-600{% else %}bg-white text-gray-600 border-gray-300 hover:bg-gray-50{% endif %}">All</a>
+    {% for val, label in status_choices %}
+    <a href="?status={{ val }}" class="px-3 py-1.5 text-xs rounded-full border {% if status_filter == val %}bg-blue-600 text-white border-blue-600{% else %}bg-white text-gray-600 border-gray-300 hover:bg-gray-50{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </div>
+
+  <div class="bg-white rounded-xl shadow overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Scheme</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Provider</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Measurand</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Year / Round</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Results Due</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Participants</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for scheme in schemes %}
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-3">
+            <a href="{% url 'proficiency:scheme_detail' scheme.pk %}" class="font-medium text-blue-600 hover:underline">{{ scheme.code }}</a>
+            <p class="text-xs text-gray-500 mt-0.5">{{ scheme.name }}</p>
+          </td>
+          <td class="px-4 py-3 text-gray-700">{{ scheme.provider.code }}</td>
+          <td class="px-4 py-3 text-gray-700">{{ scheme.measurand }}{% if scheme.unit_symbol %} ({{ scheme.unit_symbol }}){% endif %}</td>
+          <td class="px-4 py-3 text-gray-600">{{ scheme.year }} / R{{ scheme.round_number }}</td>
+          <td class="px-4 py-3 text-gray-500">{{ scheme.results_due_date|date:"M d, Y"|default:"—" }}</td>
+          <td class="px-4 py-3">
+            <span class="px-2 py-0.5 rounded-full text-xs font-medium
+              {% if scheme.status == 'OPEN' %}bg-blue-100 text-blue-800
+              {% elif scheme.status == 'ACTIVE' %}bg-green-100 text-green-800
+              {% elif scheme.status == 'RESULTS_DUE' %}bg-yellow-100 text-yellow-800
+              {% elif scheme.status == 'EVALUATING' %}bg-purple-100 text-purple-800
+              {% else %}bg-gray-100 text-gray-600{% endif %}">
+              {{ scheme.get_status_display }}
+            </span>
+          </td>
+          <td class="px-4 py-3 text-gray-600">{{ scheme.participations.count }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="px-4 py-10 text-center text-gray-400">No proficiency schemes found. <a href="{% url 'proficiency:scheme_create' %}" class="text-blue-600 hover:underline">Create one</a>.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,173 @@
+{% load licensing %}
+<nav class="bg-blue-900 text-white shadow-lg" x-data="{ open: false }">
+  <div class="container mx-auto px-4">
+    <div class="flex items-center justify-between h-16">
+
+      <!-- Logo + desktop nav links -->
+      <div class="flex items-center min-w-0">
+        {% if lab_settings.logo %}
+        <a href="/dashboard/" class="shrink-0 mr-4">
+          <img src="{{ lab_settings.logo.url }}" alt="{{ lab_settings.lab_name }}" class="h-9 object-contain">
+        </a>
+        {% else %}
+        <a href="/dashboard/" class="text-xl font-bold tracking-tight shrink-0 mr-4">{{ lab_settings.lab_name|default:"CalLIMS" }}</a>
+        {% endif %}
+
+        {% if user.is_authenticated %}
+        <div class="hidden lg:flex items-center gap-1 flex-wrap">
+          {% if user.is_lab_staff %}
+          <a href="/dashboard/"         class="hover:text-blue-200 text-sm px-2 py-1 rounded hover:bg-blue-800 whitespace-nowrap">Dashboard</a>
+          {% if 'instruments' in enabled_modules %}<a href="/instruments/"        class="hover:text-blue-200 text-sm px-2 py-1 rounded hover:bg-blue-800 whitespace-nowrap">Instruments</a>{% endif %}
+          {% if 'standards' in enabled_modules %}<a href="/standards/"          class="hover:text-blue-200 text-sm px-2 py-1 rounded hover:bg-blue-800 whitespace-nowrap">Standards</a>{% endif %}
+          {% if 'jobs' in enabled_modules %}<a href="/dashboard/jobs/"     class="hover:text-blue-200 text-sm px-2 py-1 rounded hover:bg-blue-800 whitespace-nowrap">Jobs</a>{% endif %}
+          {% if 'certificates' in enabled_modules %}<a href="/certificates/"       class="hover:text-blue-200 text-sm px-2 py-1 rounded hover:bg-blue-800 whitespace-nowrap">Certificates</a>{% endif %}
+          {% if 'clients' in enabled_modules %}<a href="/clients/"            class="hover:text-blue-200 text-sm px-2 py-1 rounded hover:bg-blue-800 whitespace-nowrap">Clients</a>{% endif %}
+          {% if 'compliance' in enabled_modules %}<a href="/compliance/audit-log/" class="hover:text-blue-200 text-sm px-2 py-1 rounded hover:bg-blue-800 whitespace-nowrap">Audit Log</a>{% endif %}
+          {% if 'proficiency' in enabled_modules %}<a href="/proficiency/"        class="hover:text-blue-200 text-sm px-2 py-1 rounded hover:bg-blue-800 whitespace-nowrap">Proficiency</a>{% endif %}
+          {% if 'nonconformance' in enabled_modules %}<a href="/nonconformance/"     class="hover:text-blue-200 text-sm px-2 py-1 rounded hover:bg-blue-800 whitespace-nowrap">NC / CAPA</a>{% endif %}
+          {% if 'sales' in enabled_modules %}{% if user.role == 'SALES' or user.role == 'MANAGER' or user.role == 'ADMIN' %}<a href="/sales/"            class="hover:text-blue-200 text-sm px-2 py-1 rounded hover:bg-blue-800 whitespace-nowrap">Sales / RFQ</a>{% endif %}{% endif %}
+          {% if user.role == 'ADMIN' or user.role == 'MANAGER' %}
+          <a href="/manage/" class="hover:text-blue-200 text-sm px-2 py-1 rounded border border-blue-700 hover:bg-blue-800 whitespace-nowrap">&#9881; Admin</a>
+          {% endif %}
+          {% endif %}
+          {% if user.is_client %}
+          {% if 'portal' in enabled_modules %}<a href="/portal/"       class="hover:text-blue-200 text-sm px-2 py-1 rounded hover:bg-blue-800 whitespace-nowrap">My Portal</a>{% endif %}
+          {% if 'certificates' in enabled_modules %}<a href="/certificates/" class="hover:text-blue-200 text-sm px-2 py-1 rounded hover:bg-blue-800 whitespace-nowrap">Certificates</a>{% endif %}
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Right side: user info + notification bell + logout (desktop) + hamburger -->
+      <div class="flex items-center gap-2 shrink-0">
+        {% if user.is_authenticated %}
+
+        <!-- Notification bell -->
+        <div class="relative" x-data="{ bellOpen: false }" @click.away="bellOpen = false">
+          <button @click="bellOpen = !bellOpen"
+                  class="relative p-2 rounded hover:bg-blue-800 focus:outline-none"
+                  aria-label="Notifications">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+            </svg>
+            <span id="notif-badge"
+                  class="absolute top-1 right-1 inline-flex items-center justify-center w-4 h-4 text-xs font-bold text-white bg-red-500 rounded-full {% if not unread_notification_count %}hidden{% endif %}">
+              <span id="notif-badge-count">{% if unread_notification_count > 9 %}9+{% else %}{{ unread_notification_count }}{% endif %}</span>
+            </span>
+          </button>
+
+          <!-- Bell dropdown -->
+          <div x-show="bellOpen" x-cloak
+               class="absolute right-0 mt-1 w-80 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
+            <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+              <span class="text-sm font-semibold text-gray-900">Notifications</span>
+              <a href="/notifications/" class="text-xs text-blue-600 hover:underline">View all</a>
+            </div>
+            {% if recent_notifications %}
+            <div class="divide-y divide-gray-50 max-h-72 overflow-y-auto">
+              {% for notif in recent_notifications %}
+              <div class="px-4 py-3 bg-blue-50 hover:bg-blue-100">
+                <p class="text-sm font-medium text-gray-900 truncate">{{ notif.title }}</p>
+                <p class="text-xs text-gray-500 mt-0.5 truncate">{{ notif.message|truncatechars:60 }}</p>
+                <div class="flex items-center justify-between mt-1">
+                  <span class="text-xs text-gray-400">{{ notif.created_at|timesince }} ago</span>
+                  <form method="post" action="/notifications/{{ notif.pk }}/read/" style="display:inline">
+                    {% csrf_token %}
+                    {% if notif.link %}<input type="hidden" name="next" value="{{ notif.link }}">{% endif %}
+                    <button type="submit" class="text-xs text-blue-600 hover:underline">Read &rarr;</button>
+                  </form>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+            {% else %}
+            <p class="px-4 py-6 text-sm text-gray-400 text-center">No new notifications</p>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="hidden lg:flex items-center gap-2">
+          <span class="text-sm text-blue-200 whitespace-nowrap">{{ user.get_full_name }}</span>
+          <span class="text-xs text-blue-300 bg-blue-800 px-2 py-0.5 rounded whitespace-nowrap">{{ user.get_role_display }}</span>
+          <a href="/auth/logout/" class="text-sm hover:text-blue-200 border border-blue-700 px-3 py-1 rounded whitespace-nowrap">Logout</a>
+        </div>
+
+        <!-- Hamburger button (visible below lg) -->
+        <button @click="open = !open" class="lg:hidden p-2 rounded hover:bg-blue-800 focus:outline-none" aria-label="Toggle menu">
+          <svg x-show="!open" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+          <svg x-show="open" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+
+        {% else %}
+        <a href="/auth/login/" class="text-sm hover:text-blue-200">Login</a>
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Mobile dropdown menu -->
+  {% if user.is_authenticated %}
+  <div x-show="open" x-cloak class="lg:hidden border-t border-blue-800 bg-blue-900 px-4 pb-4 space-y-1">
+    {% if user.is_lab_staff %}
+    <a href="/dashboard/"           class="block py-2 px-3 rounded text-sm hover:bg-blue-800">Dashboard</a>
+    {% if 'instruments' in enabled_modules %}<a href="/instruments/"          class="block py-2 px-3 rounded text-sm hover:bg-blue-800">Instruments</a>{% endif %}
+    {% if 'standards' in enabled_modules %}<a href="/standards/"            class="block py-2 px-3 rounded text-sm hover:bg-blue-800">Standards</a>{% endif %}
+    {% if 'jobs' in enabled_modules %}<a href="/dashboard/jobs/"       class="block py-2 px-3 rounded text-sm hover:bg-blue-800">Jobs</a>{% endif %}
+    {% if 'certificates' in enabled_modules %}<a href="/certificates/"         class="block py-2 px-3 rounded text-sm hover:bg-blue-800">Certificates</a>{% endif %}
+    {% if 'clients' in enabled_modules %}<a href="/clients/"              class="block py-2 px-3 rounded text-sm hover:bg-blue-800">Clients</a>{% endif %}
+    {% if 'compliance' in enabled_modules %}<a href="/compliance/audit-log/" class="block py-2 px-3 rounded text-sm hover:bg-blue-800">Audit Log</a>{% endif %}
+    {% if 'proficiency' in enabled_modules %}<a href="/proficiency/"          class="block py-2 px-3 rounded text-sm hover:bg-blue-800">Proficiency</a>{% endif %}
+    {% if 'nonconformance' in enabled_modules %}<a href="/nonconformance/"       class="block py-2 px-3 rounded text-sm hover:bg-blue-800">NC / CAPA</a>{% endif %}
+    {% if user.role == 'ADMIN' or user.role == 'MANAGER' %}
+    <a href="/manage/"               class="block py-2 px-3 rounded text-sm hover:bg-blue-800 border border-blue-700">&#9881; Admin</a>
+    {% endif %}
+    {% endif %}
+    {% if user.is_client %}
+    {% if 'portal' in enabled_modules %}<a href="/portal/"       class="block py-2 px-3 rounded text-sm hover:bg-blue-800">My Portal</a>{% endif %}
+    {% if 'certificates' in enabled_modules %}<a href="/certificates/" class="block py-2 px-3 rounded text-sm hover:bg-blue-800">Certificates</a>{% endif %}
+    {% endif %}
+    <div class="pt-2 border-t border-blue-800 mt-2 flex items-center justify-between">
+      <div>
+        <p class="text-sm text-blue-200">{{ user.get_full_name }}</p>
+        <p class="text-xs text-blue-300 bg-blue-800 px-2 py-0.5 rounded inline-block mt-0.5">{{ user.get_role_display }}</p>
+      </div>
+      <a href="/auth/logout/" class="text-sm hover:text-blue-200 border border-blue-700 px-3 py-1.5 rounded">Logout</a>
+    </div>
+  </div>
+  {% endif %}
+
+</nav>
+
+{% if user.is_authenticated %}
+<script>
+(function () {
+  var badge = document.getElementById('notif-badge');
+  var badgeCount = document.getElementById('notif-badge-count');
+  if (!badge || !badgeCount) return;
+
+  function updateBadge() {
+    fetch('/notifications/api/unread-count/', { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (!data) return;
+        var n = data.count;
+        if (n > 0) {
+          badgeCount.textContent = n > 9 ? '9+' : String(n);
+          badge.classList.remove('hidden');
+        } else {
+          badge.classList.add('hidden');
+        }
+      })
+      .catch(function () {});
+  }
+
+  setInterval(updateBadge, 30000);
+})();
+</script>
+{% endif %}

@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+{% block title %}{{ nc.nc_number }} — CalLIMS{% endblock %}
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Breadcrumb + header -->
+  <div class="flex items-start justify-between flex-wrap gap-3">
+    <div>
+      <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">
+        <a href="{% url 'nonconformance:nc_list' %}" class="hover:underline">Nonconformances</a> /
+        {{ nc.nc_number }}
+      </p>
+      <h2 class="text-2xl font-bold text-gray-900">{{ nc.nc_number }}</h2>
+      <p class="text-gray-500 text-sm mt-0.5">{{ nc.title }}</p>
+    </div>
+    <div class="flex gap-2 flex-wrap">
+      {% if nc.status != 'CLOSED' %}
+        {% if user.role == 'ADMIN' or user.role == 'MANAGER' or user == nc.detected_by %}
+        <a href="{% url 'nonconformance:nc_edit' nc.pk %}"
+           class="px-4 py-2 bg-gray-700 text-white text-sm rounded-lg hover:bg-gray-600">Edit</a>
+        {% endif %}
+        {% if user.role == 'ADMIN' or user.role == 'MANAGER' %}
+          {% if nc.all_capas_verified %}
+          <form method="post" action="{% url 'nonconformance:nc_close' nc.pk %}">
+            {% csrf_token %}
+            <button type="submit"
+                    onclick="return confirm('Close {{ nc.nc_number }}? This cannot be undone.')"
+                    class="px-4 py-2 bg-green-700 text-white text-sm rounded-lg hover:bg-green-800">
+              Close NC
+            </button>
+          </form>
+          {% else %}
+          <span class="px-4 py-2 bg-gray-100 text-gray-400 text-sm rounded-lg cursor-not-allowed"
+                title="All CAPAs must be verified before closing">Close NC</span>
+          {% endif %}
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Status banner -->
+  <div class="rounded-xl px-5 py-4 border-l-4 flex flex-wrap items-center gap-3
+    {% if nc.status == 'CLOSED' %}bg-green-50 border-green-500
+    {% elif nc.status == 'AWAITING_VERIFICATION' %}bg-blue-50 border-blue-500
+    {% elif nc.status == 'INVESTIGATING' %}bg-purple-50 border-purple-500
+    {% else %}bg-red-50 border-red-500{% endif %}">
+    <span class="text-sm font-semibold
+      {% if nc.status == 'CLOSED' %}text-green-700
+      {% elif nc.status == 'AWAITING_VERIFICATION' %}text-blue-700
+      {% elif nc.status == 'INVESTIGATING' %}text-purple-700
+      {% else %}text-red-700{% endif %}">
+      {{ nc.get_status_display }}
+    </span>
+    <span class="text-xs px-2 py-0.5 rounded-full font-semibold
+      {% if nc.severity == 'CRITICAL' %}bg-red-100 text-red-800
+      {% elif nc.severity == 'MAJOR' %}bg-orange-100 text-orange-800
+      {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+      {{ nc.get_severity_display }}
+    </span>
+    <span class="text-sm text-gray-500 ml-auto">
+      Detected {{ nc.detected_date|date:"M d, Y" }} by {{ nc.detected_by.get_full_name }}
+      {% if nc.target_closure_date %}
+        &nbsp;&bull;&nbsp; Target:
+        <span class="{% if nc.target_closure_date < today and nc.status != 'CLOSED' %}text-red-600 font-semibold{% endif %}">
+          {{ nc.target_closure_date|date:"M d, Y" }}
+        </span>
+      {% endif %}
+    </span>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+    <!-- Left: details (2 cols) -->
+    <div class="md:col-span-2 space-y-5">
+
+      <!-- NC Details -->
+      <div class="bg-white rounded-xl shadow p-6">
+        <h3 class="font-semibold text-gray-900 border-b pb-2 mb-4">Nonconformance Details</h3>
+        <dl class="grid grid-cols-2 gap-y-3 text-sm mb-4">
+          <dt class="text-gray-500">Source</dt>
+          <dd class="flex items-center gap-2">
+            {{ nc.get_source_display }}
+            {% if nc.source == 'CUSTOMER_COMPLAINT' %}
+            <span class="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-semibold">Customer</span>
+            {% endif %}
+          </dd>
+          <dt class="text-gray-500">Severity</dt><dd>{{ nc.get_severity_display }}</dd>
+          <dt class="text-gray-500">Detected Date</dt><dd>{{ nc.detected_date|date:"M d, Y" }}</dd>
+          <dt class="text-gray-500">Detected By</dt><dd>{{ nc.detected_by.get_full_name }}</dd>
+          {% if nc.closed_date %}
+          <dt class="text-gray-500">Closed</dt>
+          <dd>{{ nc.closed_date|date:"M d, Y" }}{% if nc.closed_by %} by {{ nc.closed_by.get_full_name }}{% endif %}</dd>
+          {% endif %}
+        </dl>
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Description</p>
+        <p class="text-sm text-gray-600 whitespace-pre-wrap bg-gray-50 rounded-lg p-3">{{ nc.description }}</p>
+      </div>
+
+      <!-- Linked records -->
+      {% if nc.certificate or nc.job or nc.technician %}
+      <div class="bg-white rounded-xl shadow p-6">
+        <h3 class="font-semibold text-gray-900 border-b pb-2 mb-4">Linked Calibration Records</h3>
+        <dl class="grid grid-cols-2 gap-y-3 text-sm">
+          {% if nc.certificate %}
+          <dt class="text-gray-500">Certificate</dt>
+          <dd>
+            <a href="{% url 'certificates:certificate_detail' nc.certificate.pk %}"
+               class="font-mono font-semibold text-blue-600 hover:underline">
+              {{ nc.certificate.certificate_number }}
+            </a>
+            <span class="ml-2 text-xs px-2 py-0.5 rounded-full
+              {% if nc.certificate.status == 'ISSUED' %}bg-green-100 text-green-800
+              {% elif nc.certificate.status == 'REVOKED' %}bg-red-100 text-red-800
+              {% else %}bg-gray-100 text-gray-600{% endif %}">
+              {{ nc.certificate.get_status_display }}
+            </span>
+          </dd>
+          {% endif %}
+          {% if nc.job %}
+          <dt class="text-gray-500">Calibration Job</dt>
+          <dd>
+            <a href="{% url 'workflows:job_detail' nc.job.pk %}"
+               class="font-mono text-blue-600 hover:underline">{{ nc.job.job_number }}</a>
+            <span class="ml-2 text-gray-500 text-xs">{{ nc.job.instrument }}</span>
+          </dd>
+          {% endif %}
+          {% if nc.technician %}
+          <dt class="text-gray-500">Technician</dt>
+          <dd class="font-medium">{{ nc.technician.get_full_name }}</dd>
+          {% endif %}
+        </dl>
+      </div>
+      {% endif %}
+
+      <!-- Customer Complaint Details (customer complaints only) -->
+      {% if nc.source == 'CUSTOMER_COMPLAINT' %}
+      <div class="bg-orange-50 border border-orange-200 rounded-xl p-5 space-y-4">
+        <h3 class="font-semibold text-orange-900 flex items-center gap-2">
+          <span>&#128226;</span> Customer Complaint Details
+        </h3>
+
+        <dl class="grid grid-cols-2 gap-y-3 text-sm">
+          <dt class="text-gray-500">Customer</dt>
+          <dd class="font-medium">{{ nc.customer|default:"—" }}</dd>
+          <dt class="text-gray-500">Received Via</dt>
+          <dd>
+            {% if nc.complaint_channel == 'EMAIL' %}
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-medium">&#9993; Email</span>
+            {% elif nc.complaint_channel == 'PHONE' %}
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-xs font-medium">&#128222; Phone</span>
+            {% else %}
+            <span class="text-gray-400 italic">Not recorded</span>
+            {% endif %}
+          </dd>
+        </dl>
+
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Resolution Action</p>
+          {% if nc.customer_resolution %}
+          {% if nc.customer_resolution == 'RETURN_RECALIBRATE' %}
+          <span class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-100 text-blue-800 font-semibold text-sm">
+            &#128259; Return for Recalibration
+          </span>
+          {% elif nc.customer_resolution == 'USE_AS_IS' %}
+          <span class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-100 text-green-800 font-semibold text-sm">
+            &#10003; Accept / Use As-Is
+          </span>
+          {% elif nc.customer_resolution == 'CORRECT_REISSUE' %}
+          <span class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-100 text-purple-800 font-semibold text-sm">
+            &#128196; Correct Certificate &amp; Reissue
+          </span>
+          {% endif %}
+          {% else %}
+          <p class="text-sm text-orange-700 italic">No resolution recorded.
+            {% if nc.status != 'CLOSED' and user.role != 'CLIENT' %}
+            <a href="{% url 'nonconformance:nc_edit' nc.pk %}" class="text-blue-600 hover:underline ml-1">Set resolution &rarr;</a>
+            {% endif %}
+          </p>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Investigation -->
+      <div class="bg-white rounded-xl shadow p-6">
+        <h3 class="font-semibold text-gray-900 border-b pb-2 mb-4">Investigation</h3>
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Immediate Action Taken</p>
+        {% if nc.immediate_action %}
+        <p class="text-sm text-gray-600 whitespace-pre-wrap bg-amber-50 rounded-lg p-3 mb-4 border border-amber-100">{{ nc.immediate_action }}</p>
+        {% else %}
+        <p class="text-sm text-gray-400 italic mb-4">Not recorded.</p>
+        {% endif %}
+
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Root Cause</p>
+        {% if nc.root_cause %}
+        <p class="text-sm text-gray-600 whitespace-pre-wrap bg-gray-50 rounded-lg p-3">{{ nc.root_cause }}</p>
+        {% else %}
+        <p class="text-sm text-gray-400 italic">Not yet determined.
+          {% if nc.status != 'CLOSED' and user.role != 'CLIENT' %}
+          <a href="{% url 'nonconformance:nc_edit' nc.pk %}" class="text-blue-600 hover:underline">Add root cause &rarr;</a>
+          {% endif %}
+        </p>
+        {% endif %}
+      </div>
+
+    </div>
+
+    <!-- Right: CAPAs -->
+    <div>
+      <div class="bg-white rounded-xl shadow p-5 sticky top-4">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-semibold text-gray-900 text-sm">CAPA Register</h3>
+          {% if nc.status != 'CLOSED' and user.role != 'CLIENT' %}
+          <a href="{% url 'nonconformance:capa_create' nc.pk %}"
+             class="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700">+ Add</a>
+          {% endif %}
+        </div>
+
+        {% for capa in nc.actions.all %}
+        <div class="mb-3 border rounded-lg p-3 text-xs
+          {% if capa.status == 'VERIFIED' %}border-green-200 bg-green-50
+          {% elif capa.is_overdue %}border-red-200 bg-red-50
+          {% elif capa.status == 'COMPLETED' %}border-blue-200 bg-blue-50
+          {% else %}border-gray-200{% endif %}">
+
+          <div class="flex items-center justify-between gap-1 mb-1">
+            <span class="font-semibold px-1.5 py-0.5 rounded text-xs
+              {% if capa.action_type == 'CORRECTIVE' %}bg-red-100 text-red-700
+              {% else %}bg-indigo-100 text-indigo-700{% endif %}">
+              {{ capa.get_action_type_display }}
+            </span>
+            <span class="font-medium
+              {% if capa.status == 'VERIFIED' %}text-green-700
+              {% elif capa.is_overdue %}text-red-700
+              {% elif capa.status == 'COMPLETED' %}text-blue-700
+              {% elif capa.status == 'IN_PROGRESS' %}text-purple-700
+              {% else %}text-gray-500{% endif %}">
+              {% if capa.is_overdue and capa.status != 'COMPLETED' %}Overdue
+              {% else %}{{ capa.get_status_display }}{% endif %}
+            </span>
+          </div>
+
+          <p class="text-gray-700 my-1 leading-relaxed">{{ capa.description|truncatechars:100 }}</p>
+
+          <div class="flex justify-between text-gray-400 mt-1">
+            <span>{{ capa.assigned_to.get_full_name }}</span>
+            <span>Due {{ capa.due_date|date:"M d" }}</span>
+          </div>
+
+          {% if capa.status == 'VERIFIED' and capa.verified_by %}
+          <p class="text-green-600 mt-1">
+            &#10003; {{ capa.verified_by.get_full_name }}, {{ capa.verified_at|date:"M d, Y" }}
+          </p>
+          {% endif %}
+
+          {% if capa.status != 'VERIFIED' and nc.status != 'CLOSED' %}
+          <div class="flex gap-3 mt-2 pt-1.5 border-t border-gray-100">
+            {% if user.role == 'ADMIN' or user.role == 'MANAGER' or user == nc.detected_by %}
+            <a href="{% url 'nonconformance:capa_edit' capa.pk %}" class="text-gray-500 hover:text-gray-700">Edit</a>
+            {% endif %}
+            {% if capa.status == 'OPEN' or capa.status == 'IN_PROGRESS' %}
+            <a href="{% url 'nonconformance:capa_complete' capa.pk %}" class="text-blue-600 hover:text-blue-800">Complete</a>
+            {% endif %}
+            {% if capa.status == 'COMPLETED' %}
+              {% if user.role == 'ADMIN' or user.role == 'MANAGER' or user.role == 'REVIEWER' %}
+              <form method="post" action="{% url 'nonconformance:capa_verify' capa.pk %}" class="inline">
+                {% csrf_token %}
+                <button class="text-green-700 hover:text-green-900">Verify</button>
+              </form>
+              {% endif %}
+            {% endif %}
+          </div>
+          {% endif %}
+
+        </div>
+        {% empty %}
+        <p class="text-sm text-gray-400 italic">No actions yet.</p>
+        {% endfor %}
+
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

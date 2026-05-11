@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Complete Action — {{ nc.nc_number }} — CalLIMS{% endblock %}
+{% block content %}
+<div class="max-w-xl mx-auto space-y-6">
+
+  <div>
+    <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">
+      <a href="{% url 'nonconformance:nc_list' %}" class="hover:underline">Nonconformances</a> /
+      <a href="{% url 'nonconformance:nc_detail' nc.pk %}" class="hover:underline">{{ nc.nc_number }}</a> /
+      Complete Action
+    </p>
+    <h2 class="text-2xl font-bold text-gray-900">Mark Action as Completed</h2>
+  </div>
+
+  <!-- Summary -->
+  <div class="bg-gray-50 border border-gray-200 rounded-xl p-5 text-sm space-y-2">
+    <div class="flex justify-between">
+      <span class="text-gray-500">Type</span>
+      <span class="font-medium">{{ capa.get_action_type_display }}</span>
+    </div>
+    <div class="flex justify-between">
+      <span class="text-gray-500">Assigned To</span>
+      <span class="font-medium">{{ capa.assigned_to.get_full_name }}</span>
+    </div>
+    <div class="flex justify-between">
+      <span class="text-gray-500">Due Date</span>
+      <span class="font-medium {% if capa.is_overdue %}text-red-600{% endif %}">
+        {{ capa.due_date|date:"M d, Y" }}{% if capa.is_overdue %} (overdue){% endif %}
+      </span>
+    </div>
+    <p class="text-gray-600 pt-2 border-t border-gray-200">{{ capa.description }}</p>
+  </div>
+
+  <form method="post" class="bg-white rounded-xl shadow p-6 space-y-5">
+    {% csrf_token %}
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">
+        Completion Evidence / Notes <span class="text-red-500">*</span>
+      </label>
+      <textarea name="completion_notes" rows="5" required
+                placeholder="Describe what was done and provide evidence of completion (e.g., procedure updated, re-training record ref, test result…)"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"></textarea>
+      <p class="text-xs text-gray-400 mt-1">
+        This evidence will be reviewed by a MANAGER or REVIEWER to verify effectiveness.
+      </p>
+    </div>
+
+    <div class="flex gap-3 pt-2">
+      <button type="submit"
+              class="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
+        Submit as Completed
+      </button>
+      <a href="{% url 'nonconformance:nc_detail' nc.pk %}"
+         class="px-6 py-2.5 border border-gray-300 text-sm rounded-lg text-gray-700 hover:bg-gray-50">
+        Cancel
+      </a>
+    </div>
+  </form>
+
+</div>
+{% endblock %}

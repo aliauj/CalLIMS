@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+@page {
+  size: 75mm 50mm;
+  margin: 1.5mm;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  font-size: 6pt;
+  color: #111;
+  background: #fff;
+  width: 100%;
+  height: 100%;
+}
+
+/* Outer wrapper: green accent bar + content */
+.sticker {
+  display: table;
+  width: 100%;
+  height: 100%;
+  border: 0.3mm solid #ccc;
+  border-radius: 1mm;
+  overflow: hidden;
+}
+
+.accent-bar {
+  display: table-cell;
+  width: 2.5mm;
+  background: #16a34a;
+  vertical-align: top;
+}
+
+.body {
+  display: table-cell;
+  vertical-align: top;
+  padding: 1mm 1.5mm;
+}
+
+/* Top bar: badge + lab info */
+.topbar {
+  display: table;
+  width: 100%;
+  margin-bottom: 0.8mm;
+  padding-bottom: 0.5mm;
+  border-bottom: 0.2mm solid #e5e7eb;
+}
+
+.badge-cell  { display: table-cell; vertical-align: middle; width: 1%; white-space: nowrap; }
+.badge {
+  display: inline-block;
+  background: #16a34a;
+  color: #fff;
+  font-size: 6.5pt;
+  font-weight: bold;
+  padding: 0.2mm 1.2mm;
+  border-radius: 0.5mm;
+}
+
+.labname-cell { display: table-cell; vertical-align: middle; padding-left: 1.5mm; }
+.labname { font-size: 5pt; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.labsub  { font-size: 4pt; color: #9ca3af; }
+
+{% if tmpl and tmpl.logo and logo_b64 %}
+.logo-cell { display: table-cell; vertical-align: middle; text-align: right; width: 1%; padding-left: 1mm; }
+.logo-cell img { max-height: 6mm; max-width: 14mm; object-fit: contain; }
+{% endif %}
+
+/* Main: QR left, info table right */
+.main {
+  display: table;
+  width: 100%;
+}
+
+.qr-col {
+  display: table-cell;
+  vertical-align: middle;
+  width: 20mm;
+  padding-right: 1.5mm;
+}
+
+.qr-col img {
+  display: block;
+  width: 18mm;
+  height: 18mm;
+}
+
+.info-col {
+  display: table-cell;
+  vertical-align: top;
+  width: 100%;
+}
+
+/* Info table */
+.info-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 5.5pt;
+}
+
+.info-table tr {
+  border-bottom: 0.15mm solid #e5e7eb;
+}
+
+.info-table tr:last-child {
+  border-bottom: none;
+}
+
+.info-table td {
+  padding: 0.45mm 0;
+  line-height: 1.3;
+  vertical-align: top;
+}
+
+.lbl {
+  color: #6b7280;
+  width: 28%;
+  white-space: nowrap;
+  padding-right: 1mm;
+}
+
+.val {
+  font-weight: 600;
+  color: #111;
+  word-break: break-word;
+}
+
+.val-cert {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 5.5pt;
+  font-weight: bold;
+  color: #1e3a8a;
+}
+
+.overdue { color: #dc2626; }
+</style>
+</head>
+<body>
+
+<div class="sticker">
+  <div class="accent-bar"></div>
+  <div class="body">
+
+    <!-- Top bar -->
+    <div class="topbar">
+      <div class="badge-cell"><span class="badge">CALIBRATED</span></div>
+      <div class="labname-cell">
+        <div class="labname">{% if tmpl %}{{ tmpl.lab_name }}{% else %}CalLIMS{% endif %}</div>
+        {% if tmpl and tmpl.lab_subtitle %}<div class="labsub">{{ tmpl.lab_subtitle }}</div>{% endif %}
+      </div>
+      {% if tmpl and tmpl.logo and logo_b64 %}
+      <div class="logo-cell">
+        <img src="data:{{ logo_mime }};base64,{{ logo_b64 }}" alt="logo">
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- QR + info table -->
+    <div class="main">
+
+      <div class="qr-col">
+        {% if qr_b64 %}
+        <img src="data:image/png;base64,{{ qr_b64 }}" alt="QR">
+        {% endif %}
+      </div>
+
+      <div class="info-col">
+        <table class="info-table">
+          <tr>
+            <td class="lbl">Cert&nbsp;No</td>
+            <td class="val val-cert">{{ cert.certificate_number }}</td>
+          </tr>
+          <tr>
+            <td class="lbl">Desc</td>
+            <td class="val">{{ cert.job.instrument.description|truncatechars:30 }}</td>
+          </tr>
+          <tr>
+            <td class="lbl">S/N</td>
+            <td class="val">{{ cert.job.instrument.serial_number }}</td>
+          </tr>
+          <tr>
+            <td class="lbl">Cal&nbsp;Date</td>
+            <td class="val">{{ cert.issue_date|date:"d M Y"|default:"—" }}</td>
+          </tr>
+          <tr>
+            <td class="lbl">Due&nbsp;Date</td>
+            <td class="val{% if is_overdue %} overdue{% endif %}">
+              {{ cert.expiry_date|date:"d M Y"|default:"—" }}
+            </td>
+          </tr>
+        </table>
+      </div>
+
+    </div><!-- /main -->
+  </div><!-- /body -->
+</div><!-- /sticker -->
+
+</body>
+</html>

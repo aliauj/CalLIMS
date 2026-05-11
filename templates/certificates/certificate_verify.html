@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Certificate Verification — {{ cert.certificate_number }}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-start py-10 px-4">
+
+  <div class="w-full max-w-lg">
+
+    <!-- Lab header card -->
+    <div class="bg-blue-900 rounded-2xl shadow-xl px-6 py-5 flex items-center gap-4 mb-4">
+      {% if logo_b64 %}
+      <img src="data:{{ logo_mime }};base64,{{ logo_b64 }}"
+           class="h-12 w-auto object-contain rounded"
+           alt="Lab logo">
+      {% endif %}
+      <div class="flex-1 min-w-0">
+        <p class="text-white font-bold text-lg leading-tight truncate">
+          {% if tmpl %}{{ tmpl.lab_name }}{% else %}CalLIMS{% endif %}
+        </p>
+        {% if tmpl and tmpl.lab_subtitle %}
+        <p class="text-blue-300 text-xs">{{ tmpl.lab_subtitle }}</p>
+        {% endif %}
+      </div>
+      <div class="shrink-0 text-right">
+        <p class="text-blue-300 text-xs font-mono">QR Verification</p>
+      </div>
+    </div>
+
+    <!-- Status badge card -->
+    {% if is_revoked %}
+    <div class="bg-red-600 text-white rounded-2xl shadow-lg px-6 py-4 mb-4 flex items-center gap-3">
+      <svg class="w-8 h-8 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 5.636l-12.728 12.728M5.636 5.636l12.728 12.728"/>
+      </svg>
+      <div>
+        <p class="font-bold text-xl">REVOKED</p>
+        <p class="text-red-200 text-sm">This certificate has been revoked and is no longer valid.</p>
+      </div>
+    </div>
+    {% elif is_expired %}
+    <div class="bg-amber-500 text-white rounded-2xl shadow-lg px-6 py-4 mb-4 flex items-center gap-3">
+      <svg class="w-8 h-8 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+      </svg>
+      <div>
+        <p class="font-bold text-xl">EXPIRED</p>
+        <p class="text-amber-100 text-sm">This certificate's validity period has passed.</p>
+      </div>
+    </div>
+    {% elif is_valid %}
+    <div class="bg-green-600 text-white rounded-2xl shadow-lg px-6 py-4 mb-4 flex items-center gap-3">
+      <svg class="w-8 h-8 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <div>
+        <p class="font-bold text-xl">VALID</p>
+        <p class="text-green-100 text-sm">This calibration certificate is authentic and current.</p>
+      </div>
+    </div>
+    {% else %}
+    <div class="bg-gray-500 text-white rounded-2xl shadow-lg px-6 py-4 mb-4 flex items-center gap-3">
+      <div>
+        <p class="font-bold text-xl">{{ cert.get_status_display|upper }}</p>
+        <p class="text-gray-200 text-sm">Certificate status: {{ cert.get_status_display }}</p>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Certificate info card -->
+    <div class="bg-white rounded-2xl shadow-lg overflow-hidden mb-4">
+      <div class="px-6 py-3 bg-gray-50 border-b border-gray-100">
+        <p class="text-xs font-semibold uppercase tracking-widest text-gray-400">Certificate Details</p>
+      </div>
+      <dl class="divide-y divide-gray-50">
+        {% for label, value in info %}
+        <div class="px-6 py-3 flex justify-between items-start gap-4 text-sm">
+          <dt class="text-gray-500 shrink-0 w-40">{{ label }}</dt>
+          <dd class="text-gray-900 font-medium text-right break-words">{{ value }}</dd>
+        </div>
+        {% empty %}
+        <div class="px-6 py-6 text-center text-gray-400 text-sm">No certificate details configured.</div>
+        {% endfor %}
+      </dl>
+    </div>
+
+    <!-- Download link (only if cert is issued and PDF exists) -->
+    {% if cert.status == 'ISSUED' and cert.pdf_file %}
+    <div class="bg-white rounded-2xl shadow-lg px-6 py-4 mb-4 flex items-center justify-between">
+      <span class="text-sm text-gray-600">Download official certificate PDF</span>
+      <a href="{% url 'certificates:certificate_pdf' cert.pk %}"
+         class="px-4 py-2 bg-blue-800 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
+         target="_blank">
+        Download PDF
+      </a>
+    </div>
+    {% endif %}
+
+    <!-- Footer -->
+    <p class="text-center text-xs text-gray-400 mt-4">
+      Verified at {{ request.build_absolute_uri }}
+      &nbsp;&bull;&nbsp;
+      CalLIMS Calibration Management System
+    </p>
+
+  </div>
+</body>
+</html>

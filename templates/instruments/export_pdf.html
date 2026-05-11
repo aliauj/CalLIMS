@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page {
+    size: A4 landscape;
+    margin: 12mm 14mm;
+    @top-center {
+      content: "CalLIMS — Instrument List";
+      font-size: 8pt;
+      color: #6b7280;
+    }
+    @bottom-right {
+      content: "Page " counter(page) " of " counter(pages);
+      font-size: 8pt;
+      color: #6b7280;
+    }
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 9pt;
+    color: #111827;
+  }
+
+  /* ── Header block ── */
+  .report-header {
+    margin-bottom: 10mm;
+  }
+  .report-header h1 {
+    font-size: 16pt;
+    font-weight: bold;
+    color: #1e3a5f;
+    margin-bottom: 2mm;
+  }
+  .report-header .meta {
+    font-size: 8pt;
+    color: #6b7280;
+    margin-bottom: 1.5mm;
+  }
+  .report-header .filter-tag {
+    display: inline-block;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #1d4ed8;
+    font-size: 7.5pt;
+    padding: 1mm 3mm;
+    border-radius: 3mm;
+    margin-right: 2mm;
+    margin-bottom: 1mm;
+  }
+
+  /* ── KPI row ── */
+  .kpi-row {
+    display: flex;
+    gap: 5mm;
+    margin-bottom: 8mm;
+  }
+  .kpi-box {
+    flex: 1;
+    padding: 3mm 4mm;
+    border-radius: 2mm;
+    border: 1px solid #e5e7eb;
+  }
+  .kpi-box .kpi-label { font-size: 7pt; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .kpi-box .kpi-value { font-size: 14pt; font-weight: bold; margin-top: 0.5mm; }
+  .kpi-box.blue   { border-left: 3px solid #3b82f6; }
+  .kpi-box.red    { border-left: 3px solid #ef4444; }
+  .kpi-box.orange { border-left: 3px solid #f97316; }
+  .kpi-box.green  { border-left: 3px solid #22c55e; }
+  .kpi-box.blue   .kpi-value { color: #1d4ed8; }
+  .kpi-box.red    .kpi-value { color: #dc2626; }
+  .kpi-box.orange .kpi-value { color: #ea580c; }
+  .kpi-box.green  .kpi-value { color: #16a34a; }
+
+  /* ── Table ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8.5pt;
+  }
+  thead tr {
+    background-color: #1e3a5f;
+    color: #fff;
+  }
+  thead th {
+    padding: 2.5mm 3mm;
+    text-align: left;
+    font-weight: bold;
+    white-space: nowrap;
+    font-size: 8pt;
+  }
+  tbody tr {
+    border-bottom: 0.3mm solid #e5e7eb;
+  }
+  tbody tr:nth-child(even) { background-color: #f9fafb; }
+  tbody td {
+    padding: 2mm 3mm;
+    vertical-align: top;
+  }
+  tbody tr.overdue { background-color: #fee2e2 !important; }
+  tbody tr.due-soon { background-color: #fff7ed !important; }
+  tbody tr.calibrated { background-color: #f0fdf4 !important; }
+
+  .badge {
+    display: inline-block;
+    padding: 0.5mm 2.5mm;
+    border-radius: 10mm;
+    font-size: 7.5pt;
+    font-weight: bold;
+  }
+  .badge-green  { background: #dcfce7; color: #15803d; }
+  .badge-blue   { background: #dbeafe; color: #1d4ed8; }
+  .badge-yellow { background: #fef9c3; color: #a16207; }
+  .badge-red    { background: #fee2e2; color: #b91c1c; }
+  .badge-gray   { background: #f3f4f6; color: #4b5563; }
+
+  .overdue-tag {
+    display: inline-block;
+    background: #dc2626;
+    color: #fff;
+    font-size: 6.5pt;
+    padding: 0.3mm 1.5mm;
+    border-radius: 1mm;
+    margin-left: 1mm;
+  }
+
+  .footer-note {
+    margin-top: 8mm;
+    font-size: 7.5pt;
+    color: #9ca3af;
+    border-top: 0.3mm solid #e5e7eb;
+    padding-top: 3mm;
+  }
+</style>
+</head>
+<body>
+
+<div class="report-header">
+  <h1>Instrument List Report</h1>
+  <p class="meta">
+    Generated: {{ generated_at|date:"N j, Y — H:i" }} &nbsp;|&nbsp;
+    Sorted by: {{ sort_label }} &nbsp;|&nbsp;
+    Total: {{ instruments|length }} instrument{{ instruments|length|pluralize }}
+  </p>
+  <div>
+    {% for s in summary %}
+    <span class="filter-tag">{{ s }}</span>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="kpi-row">
+  <div class="kpi-box blue">
+    <div class="kpi-label">Total</div>
+    <div class="kpi-value">{{ instruments|length }}</div>
+  </div>
+  <div class="kpi-box red">
+    <div class="kpi-label">Overdue</div>
+    <div class="kpi-value">{{ overdue_count }}</div>
+  </div>
+  <div class="kpi-box orange">
+    <div class="kpi-label">Due ≤ 30 days</div>
+    <div class="kpi-value">{{ due_30_count }}</div>
+  </div>
+  <div class="kpi-box green">
+    <div class="kpi-label">Calibrated</div>
+    <div class="kpi-value">{{ calibrated_count }}</div>
+  </div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:10%">Tag</th>
+      <th style="width:18%">Description</th>
+      <th style="width:10%">Serial #</th>
+      <th style="width:9%">Manufacturer</th>
+      <th style="width:9%">Model</th>
+      <th style="width:10%">Customer</th>
+      <th style="width:9%">Category</th>
+      <th style="width:9%">Status</th>
+      <th style="width:8%">Last Cal.</th>
+      <th style="width:9%">Next Due</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for instr in instruments %}
+    {% with is_overdue=instr.next_calibration_date|default_if_none:None %}
+    <tr class="
+      {% if instr.next_calibration_date and instr.next_calibration_date < today %}overdue
+      {% elif instr.next_calibration_date and instr.next_calibration_date <= today|date:'Y-m-d' %}due-soon
+      {% elif instr.status == 'CALIBRATED' %}calibrated{% endif %}">
+      <td style="font-family:monospace;font-weight:bold">{{ instr.asset_tag }}</td>
+      <td>{{ instr.description }}</td>
+      <td style="font-family:monospace;font-size:7.5pt">{{ instr.serial_number }}</td>
+      <td>{{ instr.manufacturer|default:"—" }}</td>
+      <td>{{ instr.model_number|default:"—" }}</td>
+      <td>{{ instr.client|default:"Internal" }}</td>
+      <td>{{ instr.category|default:"—" }}</td>
+      <td>
+        <span class="badge
+          {% if instr.status == 'CALIBRATED' %}badge-green
+          {% elif instr.status == 'ACTIVE' %}badge-blue
+          {% elif instr.status == 'IN_CALIBRATION' %}badge-yellow
+          {% elif instr.status == 'OUT_OF_SERVICE' %}badge-red
+          {% else %}badge-gray{% endif %}">
+          {{ instr.get_status_display }}
+        </span>
+      </td>
+      <td>{{ instr.last_calibration_date|date:"M d, Y"|default:"—" }}</td>
+      <td>
+        {{ instr.next_calibration_date|date:"M d, Y"|default:"—" }}
+        {% if instr.next_calibration_date and instr.next_calibration_date < today %}
+        <span class="overdue-tag">OVERDUE</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endwith %}
+    {% empty %}
+    <tr><td colspan="10" style="text-align:center;color:#9ca3af;padding:6mm">No instruments match the selected filter.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="footer-note">
+  CalLIMS Calibration Laboratory &mdash; This report is generated automatically and is valid as of {{ today|date:"N j, Y" }}.
+</div>
+
+</body>
+</html>

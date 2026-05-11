@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ client.name }} — CalLIMS{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <h2 class="text-2xl font-bold text-gray-900">{{ client.name }}</h2>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="bg-white rounded-xl shadow p-6">
+      <h3 class="font-semibold text-gray-900 border-b pb-2 mb-4">Contact Details</h3>
+      <dl class="grid grid-cols-2 gap-y-3 text-sm">
+        <dt class="text-gray-500">Type</dt><dd>{{ client.get_client_type_display }}</dd>
+        <dt class="text-gray-500">Contact</dt><dd>{{ client.contact_person|default:"—" }}</dd>
+        <dt class="text-gray-500">Email</dt><dd>{{ client.email|default:"—" }}</dd>
+        <dt class="text-gray-500">Phone</dt><dd>{{ client.phone|default:"—" }}</dd>
+        <dt class="text-gray-500">Address</dt><dd>{{ client.address|default:"—" }}</dd>
+      </dl>
+    </div>
+    <div class="bg-white rounded-xl shadow p-6">
+      <h3 class="font-semibold text-gray-900 border-b pb-2 mb-4">Instruments &amp; Gauges ({{ instruments.count }})</h3>
+      <div class="space-y-1.5 text-sm">
+        {% for instr in instruments %}
+        <div class="flex justify-between items-center py-1">
+          <a href="{% url 'instruments:instrument_detail' instr.pk %}" class="text-blue-600 hover:underline font-mono">{{ instr.asset_tag }}</a>
+          <span class="text-gray-500 truncate ml-2">{{ instr.description|truncatechars:35 }}</span>
+        </div>
+        {% empty %}
+        <p class="text-gray-400 text-center py-4">No instruments registered.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

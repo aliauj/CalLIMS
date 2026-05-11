@@ -1,0 +1,109 @@
+{% extends "administration/base_admin.html" %}
+{% block title %}Authorization Matrix — CalLIMS Admin{% endblock %}
+{% block content %}
+<div class="space-y-4">
+
+  <!-- Header -->
+  <div class="flex justify-between items-center">
+    <h2 class="text-2xl font-bold text-gray-900">Technician Authorization Matrix</h2>
+    <a href="{% url 'administration:authorization_create' %}"
+       class="px-4 py-2 bg-blue-800 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
+      + Add Authorization
+    </a>
+  </div>
+
+  {% if rows and methods %}
+  <div class="bg-white rounded-xl shadow overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="text-sm border-collapse">
+        <thead class="bg-gray-50 border-b border-gray-200">
+          <tr>
+            <th class="px-4 py-3 text-left font-medium text-gray-600 whitespace-nowrap sticky left-0 bg-gray-50 z-10 min-w-[180px]">
+              Technician
+            </th>
+            {% for method in methods %}
+            <th class="px-3 py-3 text-center font-medium text-gray-600 whitespace-nowrap min-w-[100px]">
+              <span class="font-mono text-xs" title="{{ method.name }}">{{ method.code }}</span>
+            </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for tech, cells in rows %}
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 font-medium text-gray-800 sticky left-0 bg-white border-r border-gray-100 whitespace-nowrap">
+              <a href="{% url 'administration:user_detail' tech.pk %}" class="hover:text-blue-700 hover:underline">
+                {{ tech.get_full_name }}
+              </a>
+            </td>
+            {% for auth, method in cells %}
+            <td class="px-3 py-3 text-center">
+              {% if auth %}
+                <a href="{% url 'administration:authorization_edit' auth.pk %}"
+                   title="{{ auth.get_status_display }}{% if auth.expiry_date %} — Expires {{ auth.expiry_date|date:'M d, Y' }}{% endif %}">
+                  <span class="px-2 py-1 rounded-full text-xs font-medium cursor-pointer
+                    {% if auth.status == 'AUTHORIZED' %}bg-green-100 text-green-800 hover:bg-green-200
+                    {% elif auth.status == 'PENDING' %}bg-yellow-100 text-yellow-800 hover:bg-yellow-200
+                    {% elif auth.status == 'SUSPENDED' %}bg-orange-100 text-orange-800 hover:bg-orange-200
+                    {% elif auth.status == 'REVOKED' %}bg-red-100 text-red-800 hover:bg-red-200
+                    {% else %}bg-gray-100 text-gray-700{% endif %}">
+                    {% if auth.status == 'AUTHORIZED' %}AUTH
+                    {% elif auth.status == 'PENDING' %}PEND
+                    {% elif auth.status == 'SUSPENDED' %}SUSP
+                    {% elif auth.status == 'REVOKED' %}REV
+                    {% else %}{{ auth.status }}{% endif %}
+                  </span>
+                </a>
+              {% else %}
+                <a href="{% url 'administration:authorization_create' %}?technician={{ tech.pk }}&method={{ method.pk }}"
+                   title="Add authorization for {{ tech.get_full_name }} — {{ method.code }}"
+                   class="text-gray-300 hover:text-blue-500 text-lg leading-none">&mdash;</a>
+              {% endif %}
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div class="bg-white rounded-xl shadow p-4">
+    <p class="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">Legend</p>
+    <div class="flex flex-wrap gap-3">
+      <span class="flex items-center gap-2 text-sm">
+        <span class="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">AUTH</span>
+        Authorized
+      </span>
+      <span class="flex items-center gap-2 text-sm">
+        <span class="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">PEND</span>
+        Pending Evaluation
+      </span>
+      <span class="flex items-center gap-2 text-sm">
+        <span class="px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">SUSP</span>
+        Suspended
+      </span>
+      <span class="flex items-center gap-2 text-sm">
+        <span class="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">REV</span>
+        Revoked
+      </span>
+      <span class="flex items-center gap-2 text-sm">
+        <span class="text-gray-300 text-lg">&mdash;</span>
+        No record — click to add
+      </span>
+    </div>
+  </div>
+
+  {% elif not rows %}
+  <div class="bg-white rounded-xl shadow p-8 text-center text-gray-400">
+    <p>No active technicians found.</p>
+  </div>
+  {% else %}
+  <div class="bg-white rounded-xl shadow p-8 text-center text-gray-400">
+    <p>No active calibration methods found.</p>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

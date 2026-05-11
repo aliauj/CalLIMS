@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}{{ action }} Action — {{ nc.nc_number }} — CalLIMS{% endblock %}
+{% block content %}
+<div class="max-w-xl mx-auto space-y-6">
+
+  <div>
+    <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">
+      <a href="{% url 'nonconformance:nc_list' %}" class="hover:underline">Nonconformances</a> /
+      <a href="{% url 'nonconformance:nc_detail' nc.pk %}" class="hover:underline">{{ nc.nc_number }}</a> /
+      {{ action }} Action
+    </p>
+    <h2 class="text-2xl font-bold text-gray-900">{{ action }} Corrective / Preventive Action</h2>
+    <p class="text-sm text-gray-500 mt-0.5">{{ nc.title }}</p>
+  </div>
+
+  <form method="post" class="bg-white rounded-xl shadow p-6 space-y-5">
+    {% csrf_token %}
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Action Type <span class="text-red-500">*</span></label>
+      <select name="action_type" required
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+        {% for val, label in action_type_choices %}
+        <option value="{{ val }}"
+          {% if capa and capa.action_type == val %}selected
+          {% elif not capa and val == 'CORRECTIVE' %}selected{% endif %}>
+          {{ label }}
+        </option>
+        {% endfor %}
+      </select>
+      <p class="text-xs text-gray-400 mt-1">
+        <strong>Corrective</strong> — fixes the root cause of this specific event.
+        <strong>Preventive</strong> — prevents recurrence in future.
+      </p>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Description <span class="text-red-500">*</span></label>
+      <textarea name="description" rows="4" required
+                placeholder="Describe the action to be taken in enough detail to be verifiable…"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">{{ capa.description|default:'' }}</textarea>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Assigned To <span class="text-red-500">*</span></label>
+        <select name="assigned_to" required
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+          <option value="">— select —</option>
+          {% for s in staff %}
+          <option value="{{ s.pk }}"
+            {% if capa and capa.assigned_to_id == s.pk %}selected
+            {% elif nc.technician_id == s.pk %}selected{% endif %}>
+            {{ s.get_full_name }} ({{ s.get_role_display }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Due Date <span class="text-red-500">*</span></label>
+        <input type="date" name="due_date" required
+               value="{{ capa.due_date|date:'Y-m-d'|default:'' }}"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+      </div>
+
+    </div>
+
+    <div class="flex gap-3 pt-2">
+      <button type="submit"
+              class="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
+        {% if capa %}Save Changes{% else %}Add Action{% endif %}
+      </button>
+      <a href="{% url 'nonconformance:nc_detail' nc.pk %}"
+         class="px-6 py-2.5 border border-gray-300 text-sm rounded-lg text-gray-700 hover:bg-gray-50">
+        Cancel
+      </a>
+    </div>
+
+  </form>
+</div>
+{% endblock %}

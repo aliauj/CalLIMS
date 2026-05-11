@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}{{ standard.serial_number }} — CalLIMS{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <div class="flex items-start justify-between">
+    <h2 class="text-2xl font-bold text-gray-900">{{ standard.name }}</h2>
+    {% if user.role == 'ADMIN' or user.role == 'MANAGER' %}
+    <a href="{% url 'standards:standard_edit' standard.pk %}"
+       class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">Edit Standard</a>
+    {% endif %}
+  </div>
+  <div class="grid grid-cols-1 gap-6">
+    <div class="bg-white rounded-xl shadow p-6">
+      <h3 class="font-semibold text-gray-900 border-b pb-2 mb-4">Standard Details</h3>
+      <dl class="grid grid-cols-2 gap-y-3 text-sm">
+        <dt class="text-gray-500">Serial #</dt><dd class="font-mono">{{ standard.serial_number }}</dd>
+        <dt class="text-gray-500">Manufacturer</dt><dd>{{ standard.manufacturer|default:"&mdash;" }}</dd>
+        <dt class="text-gray-500">Status</dt><dd>{{ standard.get_status_display }}</dd>
+        <dt class="text-gray-500">Custodian</dt><dd>{{ standard.custodian.get_full_name|default:"&mdash;" }}</dd>
+        <dt class="text-gray-500">Issued By</dt><dd>{{ standard.issued_by|default:"&mdash;" }}</dd>
+        <dt class="text-gray-500">Certificate #</dt><dd>{{ standard.certificate_number|default:"&mdash;" }}</dd>
+        <dt class="text-gray-500">Cal. Date</dt><dd>{{ standard.calibration_date|date:"M d, Y" }}</dd>
+        <dt class="text-gray-500">Due Date</dt>
+        <dd class="{% if not standard.is_valid %}text-red-600 font-semibold{% endif %}">
+          {{ standard.calibration_due_date|date:"M d, Y" }}
+          {% if not standard.is_valid %}<span class="text-red-500 text-xs ml-1">EXPIRED</span>{% endif %}
+        </dd>
+      </dl>
+    </div>
+    <div class="bg-white rounded-xl shadow p-6">
+      <h3 class="font-semibold text-gray-900 border-b pb-2 mb-4">Uncertainties</h3>
+      {% with entries=standard.uncertainties.all %}
+      {% if entries %}
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead>
+            <tr class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+              <th class="px-3 py-2 text-left">#</th>
+              <th class="px-3 py-2 text-left">Parameter</th>
+              <th class="px-3 py-2 text-left">Range</th>
+              <th class="px-3 py-2 text-right font-mono">u (k=1)</th>
+              <th class="px-3 py-2 text-right font-mono">k</th>
+              <th class="px-3 py-2 text-right font-mono">U (expanded)</th>
+              <th class="px-3 py-2 text-left">Unit</th>
+              <th class="px-3 py-2 text-right">Conf. %</th>
+              <th class="px-3 py-2 text-left">Notes</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            {% for u in entries %}
+            <tr class="hover:bg-gray-50">
+              <td class="px-3 py-2 text-gray-400">{{ u.sequence }}</td>
+              <td class="px-3 py-2 font-medium text-gray-900">{{ u.parameter }}</td>
+              <td class="px-3 py-2 text-gray-500">{{ u.range_description|default:"&mdash;" }}</td>
+              <td class="px-3 py-2 text-right font-mono">{{ u.uncertainty_value }}</td>
+              <td class="px-3 py-2 text-right font-mono">{{ u.coverage_factor }}</td>
+              <td class="px-3 py-2 text-right font-mono font-semibold text-blue-700">±{{ u.expanded_uncertainty }}</td>
+              <td class="px-3 py-2">{{ u.unit.symbol }}</td>
+              <td class="px-3 py-2 text-right">{{ u.confidence_level }}%</td>
+              <td class="px-3 py-2 text-gray-400 text-xs">{{ u.notes|default:"" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-sm text-gray-400">No uncertainty entries recorded.</p>
+      {% endif %}
+      {% endwith %}
+    </div>
+
+    <div class="bg-white rounded-xl shadow p-6">
+      <h3 class="font-semibold text-gray-900 border-b pb-2 mb-4">Traceability Chain</h3>
+      {% if standard.traceability_chain %}
+      <ol class="list-decimal list-inside space-y-1.5 text-sm text-gray-600">
+        {% for link in standard.traceability_chain %}
+        <li class="bg-gray-50 px-3 py-1.5 rounded">{{ link.issuing_body }} &mdash; Cert: {{ link.cert_number }} ({{ link.date }})</li>
+        {% endfor %}
+      </ol>
+      {% else %}
+      <p class="text-sm text-gray-400">No traceability chain recorded.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Edit Certificate {{ cert.certificate_number }} — CalLIMS{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-6">
+
+  <div>
+    <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">
+      <a href="{% url 'certificates:certificate_list' %}" class="hover:underline">Certificates</a> /
+      <a href="{% url 'certificates:certificate_detail' cert.pk %}" class="hover:underline font-mono">{{ cert.certificate_number }}</a> /
+      Edit
+    </p>
+    <h2 class="text-2xl font-bold text-gray-900">Certificate Information</h2>
+    <p class="text-sm text-gray-500 mt-0.5">{{ cert.job.instrument }} — {{ cert.job.method.code }}</p>
+  </div>
+
+  <!-- Read-only summary -->
+  <div class="bg-gray-50 rounded-xl border border-gray-200 p-5 grid grid-cols-2 gap-3 text-sm">
+    <div><span class="text-gray-500">Certificate No.</span><br><span class="font-mono font-semibold">{{ cert.certificate_number }}</span></div>
+    <div><span class="text-gray-500">Job No.</span><br><a href="{% url 'workflows:job_detail' cert.job.pk %}" class="font-mono text-blue-600 hover:underline">{{ cert.job.job_number }}</a></div>
+    <div><span class="text-gray-500">Asset Tag</span><br><span class="font-mono">{{ cert.job.instrument.asset_tag }}</span></div>
+    <div><span class="text-gray-500">Instrument</span><br>{{ cert.job.instrument.description }}</div>
+    <div><span class="text-gray-500">Serial No.</span><br>{{ cert.job.instrument.serial_number }}</div>
+    <div><span class="text-gray-500">Client</span><br>{{ cert.job.instrument.client|default:"Internal" }}</div>
+  </div>
+
+  <form method="post" class="bg-white rounded-xl shadow p-6 space-y-5">
+    {% csrf_token %}
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Issue Date <span class="text-red-500">*</span></label>
+        <input type="date" name="issue_date" required
+               value="{{ cert.issue_date|date:'Y-m-d'|default:'' }}"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+        <p class="text-xs text-gray-400 mt-1">Date the calibration was completed</p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Expiry Date <span class="text-red-500">*</span></label>
+        <input type="date" name="expiry_date" required
+               value="{{ cert.expiry_date|date:'Y-m-d'|default:'' }}"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+        <p class="text-xs text-gray-400 mt-1">Next calibration due date</p>
+      </div>
+
+      <div class="md:col-span-2">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Authorized Signatory</label>
+        <select name="signatory"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+          <option value="">— to be signed —</option>
+          {% for s in signatories %}
+          <option value="{{ s.pk }}"
+            {% if cert.signed_by_id == s.pk %}selected{% endif %}>
+            {{ s.get_full_name }} ({{ s.get_role_display }})
+          </option>
+          {% endfor %}
+        </select>
+        <p class="text-xs text-gray-400 mt-1">
+          Pre-select the signatory. The actual signature is applied when they click "Sign Certificate" on the detail page.
+        </p>
+      </div>
+
+      <div class="md:col-span-2">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Remarks / Notes</label>
+        <textarea name="notes" rows="4"
+                  placeholder="Any observations, conditions, limitations, or special notes to appear on the certificate…"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">{{ cert.notes }}</textarea>
+        <p class="text-xs text-gray-400 mt-1">These notes will appear on the printed certificate.</p>
+      </div>
+
+    </div>
+
+    <div class="bg-blue-50 rounded-xl p-4 text-xs text-blue-700 border border-blue-100 space-y-1">
+      <p><strong>What happens next?</strong></p>
+      <p>1. Save this information → status stays <em>Pending Signature</em>.</p>
+      <p>2. The authorized signatory opens the certificate and clicks <strong>Sign Certificate</strong> — their name, role, and timestamp are locked in.</p>
+      <p>3. A manager then clicks <strong>Issue to Client</strong> — the certificate becomes visible in the client portal.</p>
+    </div>
+
+    <div class="flex gap-3 pt-2">
+      <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
+        Save Certificate Information
+      </button>
+      <a href="{% url 'certificates:certificate_detail' cert.pk %}"
+         class="px-6 py-2.5 border border-gray-300 text-sm rounded-lg text-gray-700 hover:bg-gray-50">
+        Cancel
+      </a>
+    </div>
+
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Certificates — CalLIMS{% endblock %}
+{% block content %}
+<div class="space-y-4">
+
+  <!-- Header -->
+  <div class="flex justify-between items-center">
+    <h2 class="text-2xl font-bold text-gray-900">Calibration Certificates</h2>
+    {% with active_count=status_filter|length|add:client_filter|length|add:tech_filter|length|add:cert_num_filter|length|add:instrument_filter|length %}
+    {% if active_count %}
+    <span class="text-sm text-blue-600 bg-blue-50 border border-blue-200 px-3 py-1 rounded-full">
+      Filters active &mdash; <a href="{% url 'certificates:certificate_list' %}" class="underline hover:text-blue-800">Clear all</a>
+    </span>
+    {% endif %}
+    {% endwith %}
+  </div>
+
+  <!-- Filter bar -->
+  <form method="get" class="bg-white rounded-xl shadow px-5 py-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Certificate #</label>
+        <input type="text" name="cert_number" value="{{ cert_num_filter }}"
+               placeholder="Search cert no."
+               class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500">
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Instrument Tag</label>
+        <input type="text" name="instrument" value="{{ instrument_filter }}"
+               placeholder="e.g. ELE-0001"
+               class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500">
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Status</label>
+        <select name="status" class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500">
+          <option value="">All statuses</option>
+          {% for val, label in status_choices %}
+          <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      {% if not user.is_client %}
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Customer</label>
+        <select name="client" class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500">
+          <option value="">All customers</option>
+          <option value="internal" {% if client_filter == 'internal' %}selected{% endif %}>Internal</option>
+          {% for c in clients %}
+          <option value="{{ c.pk }}" {% if client_filter == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Assigned Technician</label>
+        <select name="technician" class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500">
+          <option value="">All technicians</option>
+          {% for tech in technicians %}
+          <option value="{{ tech.pk }}" {% if tech_filter == tech.pk|stringformat:'s' %}selected{% endif %}>{{ tech.get_full_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+
+    </div>
+    <div class="flex gap-2 mt-3">
+      <button type="submit" class="px-4 py-1.5 bg-blue-800 text-white text-sm rounded-lg hover:bg-blue-700">Search</button>
+      <a href="{% url 'certificates:certificate_list' %}" class="px-4 py-1.5 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">Clear</a>
+    </div>
+  </form>
+
+  <!-- Results count -->
+  <p class="text-sm text-gray-500">
+    {{ certificates|length }} certificate{{ certificates|length|pluralize }} found
+    {% if status_filter or client_filter or tech_filter or cert_num_filter or instrument_filter %}
+    with active filters
+    {% endif %}
+  </p>
+
+  <!-- Table -->
+  <div class="bg-white rounded-xl shadow overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-4 py-3 text-left font-medium text-gray-600 whitespace-nowrap">Certificate #</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600 whitespace-nowrap">Job #</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Equipment</th>
+          {% if not user.is_client %}
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Customer</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600 whitespace-nowrap">Assigned Tech</th>
+          {% endif %}
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600 whitespace-nowrap">Issue Date</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600 whitespace-nowrap">Signed By</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">PDF</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for cert in certificates %}
+        <tr class="hover:bg-gray-50 {% if cert.status == 'REVOKED' %}opacity-60{% endif %}">
+          <td class="px-4 py-3">
+            <a href="{% url 'certificates:certificate_detail' cert.pk %}"
+               class="text-blue-600 hover:underline font-medium font-mono">{{ cert.certificate_number }}</a>
+          </td>
+          <td class="px-4 py-3 font-mono text-xs text-gray-600">
+            <a href="{% url 'workflows:job_detail' cert.job.pk %}" class="hover:underline text-blue-600">{{ cert.job.job_number }}</a>
+          </td>
+          <td class="px-4 py-3">
+            <div class="font-medium text-gray-900 font-mono text-xs">{{ cert.job.instrument.asset_tag }}</div>
+            <div class="text-gray-500 text-xs">{{ cert.job.instrument.description|truncatechars:40 }}</div>
+          </td>
+          {% if not user.is_client %}
+          <td class="px-4 py-3 text-gray-600">
+            {% if cert.job.instrument.client %}
+            {{ cert.job.instrument.client }}
+            {% else %}
+            <span class="text-gray-400 text-xs">Internal</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-3 text-gray-600">
+            {{ cert.job.assigned_to.get_full_name|default:"—" }}
+          </td>
+          {% endif %}
+          <td class="px-4 py-3">
+            <span class="px-2 py-1 rounded-full text-xs font-medium
+              {% if cert.status == 'ISSUED' %}bg-green-100 text-green-800
+              {% elif cert.status == 'SIGNED' %}bg-blue-100 text-blue-800
+              {% elif cert.status == 'REVOKED' %}bg-red-100 text-red-800
+              {% elif cert.status == 'PENDING_SIGN' %}bg-yellow-100 text-yellow-800
+              {% else %}bg-gray-100 text-gray-700{% endif %}">
+              {{ cert.get_status_display }}
+            </span>
+          </td>
+          <td class="px-4 py-3 text-gray-500 whitespace-nowrap">{{ cert.issue_date|date:"M d, Y"|default:"—" }}</td>
+          <td class="px-4 py-3 text-gray-600">{{ cert.signed_by.get_full_name|default:"—" }}</td>
+          <td class="px-4 py-3">
+            {% if cert.pdf_file %}
+            <a href="{% url 'certificates:certificate_pdf' cert.pk %}"
+               class="text-blue-600 hover:underline text-xs" target="_blank">Download</a>
+            {% elif cert.status in 'SIGNED ISSUED' %}
+            <a href="{% url 'certificates:certificate_print' cert.pk %}"
+               class="text-gray-500 hover:underline text-xs" target="_blank">Print</a>
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="{% if user.is_client %}7{% else %}9{% endif %}"
+              class="px-4 py-10 text-center text-gray-400">
+            {% if status_filter or client_filter or tech_filter or cert_num_filter or instrument_filter %}
+            No certificates match your filters.
+            <a href="{% url 'certificates:certificate_list' %}" class="text-blue-600 hover:underline ml-1">Clear filters</a>
+            {% else %}
+            No certificates generated yet.
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+{% endblock %}

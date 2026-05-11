@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Certificate Template Settings — CalLIMS{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+
+  <div>
+    <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">
+      <a href="{% url 'administration:dashboard' %}" class="hover:underline">Administration</a> / Certificate Template
+    </p>
+    <h2 class="text-2xl font-bold text-gray-900">Certificate Template Settings</h2>
+    <p class="text-sm text-gray-500 mt-0.5">These values appear on every printed calibration certificate.</p>
+  </div>
+
+  {% if messages %}
+  {% for m in messages %}
+  <div class="px-4 py-3 rounded-lg text-sm
+    {% if m.tags == 'success' %}bg-green-50 text-green-800 border border-green-200
+    {% else %}bg-red-50 text-red-800 border border-red-200{% endif %}">
+    {{ m }}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  <form method="post" class="bg-white rounded-xl shadow p-6 space-y-6">
+    {% csrf_token %}
+
+    <!-- Lab Identity -->
+    <div>
+      <h3 class="text-sm font-semibold text-gray-700 border-b pb-2 mb-4">Lab Identity (Header)</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Lab Name <span class="text-red-500">*</span>
+          </label>
+          <input type="text" name="lab_name" required maxlength="150"
+                 value="{{ tmpl.lab_name }}"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+          <p class="text-xs text-gray-400 mt-1">Printed in large bold text in the PDF header.</p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Lab Subtitle</label>
+          <input type="text" name="lab_subtitle" maxlength="150"
+                 value="{{ tmpl.lab_subtitle }}"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+          <p class="text-xs text-gray-400 mt-1">e.g. "Calibration Laboratory"</p>
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Accreditation Text</label>
+          <input type="text" name="accreditation_text" maxlength="255"
+                 value="{{ tmpl.accreditation_text }}"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+          <p class="text-xs text-gray-400 mt-1">Shown in the top-right corner, e.g. "ISO/IEC 17025 Accredited — UKAS No. 1234"</p>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Declaration Statement -->
+    <div>
+      <h3 class="text-sm font-semibold text-gray-700 border-b pb-2 mb-4">Declaration Statement</h3>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Declaration</label>
+      <textarea name="declaration_statement" rows="5"
+                placeholder="We hereby certify that the above-described instrument was calibrated using methods traceable to national/international measurement standards in accordance with ISO/IEC 17025…"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 font-mono">{{ tmpl.declaration_statement }}</textarea>
+      <p class="text-xs text-gray-400 mt-1">
+        Printed above the signature block on every certificate, inside a blue-bordered box.
+        Leave blank to omit the declaration section from the PDF.
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div>
+      <h3 class="text-sm font-semibold text-gray-700 border-b pb-2 mb-4">Footer</h3>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Additional Footer Text</label>
+      <input type="text" name="footer_text" maxlength="500"
+             value="{{ tmpl.footer_text }}"
+             placeholder="e.g. This certificate may not be reproduced other than in full."
+             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+      <p class="text-xs text-gray-400 mt-1">Appended after the SHA-256 hash line in the PDF footer.</p>
+    </div>
+
+    <!-- Preview note -->
+    <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 text-xs text-blue-700 space-y-1">
+      <p><strong>Where each field appears on the PDF:</strong></p>
+      <ul class="list-disc list-inside space-y-0.5 ml-1">
+        <li><strong>Lab Name</strong> — large heading, top-left of header</li>
+        <li><strong>Lab Subtitle</strong> — small text below lab name</li>
+        <li><strong>Accreditation Text</strong> — top-right corner</li>
+        <li><strong>Declaration Statement</strong> — blue-bordered block above signatures</li>
+        <li><strong>Footer Text</strong> — bottom of each page after the hash</li>
+      </ul>
+      <p class="mt-2">
+        <strong>Per-certificate Remarks</strong> are edited on the individual certificate's
+        <em>Edit Certificate Information</em> page and appear in an amber-bordered block
+        just below the declaration.
+      </p>
+    </div>
+
+    <div class="flex gap-3 pt-2">
+      <button type="submit"
+              class="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
+        Save Settings
+      </button>
+      <a href="{% url 'administration:dashboard' %}"
+         class="px-6 py-2.5 border border-gray-300 text-sm rounded-lg text-gray-700 hover:bg-gray-50">
+        Cancel
+      </a>
+    </div>
+
+  </form>
+
+  {% if tmpl.updated_at %}
+  <p class="text-xs text-gray-400 text-right">
+    Last saved: {{ tmpl.updated_at|date:"M d, Y H:i" }}
+  </p>
+  {% endif %}
+
+</div>
+{% endblock %}

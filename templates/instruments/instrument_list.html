@@ -1,0 +1,425 @@
+{% extends "base.html" %}
+{% block title %}Instruments & Gauges — CalLIMS{% endblock %}
+
+{% block extra_head %}
+<script>
+const INSTR_DATA = {
+  {% for instr in instruments %}"{{ instr.pk }}": {"tag":"{{ instr.asset_tag|escapejs }}","serial":"{{ instr.serial_number|escapejs }}","client_id":"{{ instr.client.pk|default:'' }}"}{% if not forloop.last %},{% endif %}{% endfor %}
+};
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-4"
+     x-data="{
+       selected: [],
+       showDelete: false,
+       showDuplicate: false,
+       showExport: false,
+       dupPk: null,
+       dupTag: '',
+       dupSerial: '',
+       dupClientId: '',
+
+       allIds: [{% for instr in instruments %}{{ instr.pk }}{% if not forloop.last %},{% endif %}{% endfor %}],
+
+       get noneSelected()  { return this.selected.length === 0; },
+       get oneSelected()   { return this.selected.length === 1; },
+       get allChecked()    { return this.allIds.length > 0 && this.selected.length === this.allIds.length; },
+
+       toggleAll() {
+         this.selected = this.allChecked ? [] : [...this.allIds.map(String)];
+       },
+
+       createJob() {
+         window.location = '{% url 'workflows:job_create' %}?instrument=' + this.selected[0];
+       },
+
+       openDuplicate() {
+         const d = INSTR_DATA[this.selected[0]];
+         if (!d) return;
+         this.dupPk      = this.selected[0];
+         this.dupTag     = d.tag + '-COPY';
+         this.dupSerial  = '';
+         this.dupClientId = d.client_id;
+         this.showDuplicate = true;
+       },
+     }">
+
+  <!-- Header -->
+  <div class="flex justify-between items-center">
+    <h2 class="text-2xl font-bold text-gray-900">Instruments &amp; Gauges</h2>
+    <div class="flex gap-2">
+      <button @click="showExport = true"
+              class="flex items-center gap-1.5 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+        Export List
+      </button>
+      <a href="{% url 'instruments:instrument_create' %}" class="bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">+ Register Instrument</a>
+    </div>
+  </div>
+
+  <!-- Filter bar -->
+  <form method="get" class="bg-white rounded-xl shadow px-5 py-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Instrument Tag</label>
+        <input type="text" name="tag" value="{{ tag_filter }}" placeholder="Search tag…"
+               class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Description</label>
+        <input type="text" name="desc" value="{{ desc_filter }}" placeholder="Search description…"
+               class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Serial No.</label>
+        <input type="text" name="serial" value="{{ serial_filter }}" placeholder="Search serial…"
+               class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500">
+      </div>
+      {% if not user.is_client %}
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Customer</label>
+        <select name="client" class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500">
+          <option value="">All customers</option>
+          <option value="internal" {% if client_filter == 'internal' %}selected{% endif %}>Internal</option>
+          {% for c in clients %}
+          <option value="{{ c.pk }}" {% if client_filter == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Status</label>
+        <select name="status" class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500">
+          <option value="">All statuses</option>
+          {% for val, label in status_choices %}
+          <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="flex gap-2 mt-3">
+      <button type="submit" class="px-4 py-1.5 bg-blue-800 text-white text-sm rounded-lg hover:bg-blue-700">Search</button>
+      <a href="{% url 'instruments:instrument_list' %}" class="px-4 py-1.5 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">Clear</a>
+    </div>
+  </form>
+
+  <!-- Table -->
+  <div class="bg-white rounded-xl shadow overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-4 py-3 w-10">
+            <input type="checkbox" class="w-4 h-4 rounded border-gray-300 text-blue-600"
+                   :checked="allChecked" @change="toggleAll()">
+          </th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Instrument Tag</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Description</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Serial #</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Client</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
+          <th class="px-4 py-3 text-left font-medium text-gray-600">Next Calibration</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for instr in instruments %}
+        <tr :class="selected.includes('{{ instr.pk }}') ? 'bg-blue-50' : '{% if instr.is_overdue %}bg-red-50{% endif %} hover:bg-gray-50'">
+          <td class="px-4 py-3">
+            <input type="checkbox" value="{{ instr.pk }}" x-model="selected"
+                   class="w-4 h-4 rounded border-gray-300 text-blue-600">
+          </td>
+          <td class="px-4 py-3">
+            <a href="{% url 'instruments:instrument_detail' instr.pk %}" class="text-blue-600 hover:underline font-mono font-medium">{{ instr.asset_tag }}</a>
+          </td>
+          <td class="px-4 py-3">{{ instr.description }}</td>
+          <td class="px-4 py-3 font-mono text-xs text-gray-500">{{ instr.serial_number }}</td>
+          <td class="px-4 py-3">{{ instr.client|default:"Internal" }}</td>
+          <td class="px-4 py-3">
+            <span class="px-2 py-1 rounded-full text-xs font-medium
+              {% if instr.status == 'CALIBRATED' %}bg-green-100 text-green-800
+              {% elif instr.status == 'ACTIVE' %}bg-blue-100 text-blue-800
+              {% elif instr.status == 'OUT_OF_SERVICE' %}bg-red-100 text-red-800
+              {% elif instr.status == 'IN_CALIBRATION' %}bg-yellow-100 text-yellow-800
+              {% else %}bg-gray-100 text-gray-700{% endif %}">
+              {{ instr.get_status_display }}
+            </span>
+          </td>
+          <td class="px-4 py-3 {% if instr.is_overdue %}text-red-600 font-semibold{% else %}text-gray-600{% endif %}">
+            {{ instr.next_calibration_date|date:"M d, Y"|default:"&mdash;" }}
+            {% if instr.is_overdue %}<span class="text-xs ml-1 text-red-500">OVERDUE</span>{% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">No instruments found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── Floating action bar ─────────────────────────────────── -->
+  <div x-show="selected.length > 0" x-cloak
+       x-transition:enter="transition ease-out duration-150"
+       x-transition:enter-start="opacity-0 translate-y-3"
+       x-transition:enter-end="opacity-100 translate-y-0"
+       x-transition:leave="transition ease-in duration-100"
+       x-transition:leave-start="opacity-100 translate-y-0"
+       x-transition:leave-end="opacity-0 translate-y-3"
+       class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40
+              bg-gray-900 text-white rounded-2xl shadow-2xl
+              px-5 py-3 flex items-center gap-3 whitespace-nowrap">
+
+    <span class="text-sm text-gray-300 font-medium pr-1">
+      <span x-text="selected.length"></span> selected
+    </span>
+    <div class="w-px h-5 bg-gray-700"></div>
+
+    <!-- Create Job — single only -->
+    <button @click="oneSelected && createJob()"
+            :disabled="!oneSelected"
+            :class="oneSelected ? 'bg-blue-600 hover:bg-blue-500 cursor-pointer' : 'opacity-40 cursor-not-allowed'"
+            :title="!oneSelected ? 'Select exactly one instrument' : 'Create calibration job'"
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+      </svg>
+      Create Job
+    </button>
+
+    <!-- Duplicate — single only -->
+    <button @click="oneSelected && openDuplicate()"
+            :disabled="!oneSelected"
+            :class="oneSelected ? 'bg-green-700 hover:bg-green-600 cursor-pointer' : 'opacity-40 cursor-not-allowed'"
+            :title="!oneSelected ? 'Select exactly one instrument' : 'Duplicate instrument'"
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+      </svg>
+      Duplicate
+    </button>
+
+    <!-- Delete -->
+    <button @click="showDelete = true"
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-red-700 hover:bg-red-600 transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+      </svg>
+      Delete
+    </button>
+
+    <button @click="selected = []" class="text-gray-400 hover:text-white ml-1 transition-colors" title="Clear selection">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- ── Delete confirmation modal ──────────────────────────── -->
+  <div x-show="showDelete" x-cloak
+       class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+      <h3 class="text-lg font-bold text-gray-900">Delete Instruments</h3>
+      <p class="text-sm text-gray-600">
+        You are about to delete <span class="font-semibold" x-text="selected.length"></span> instrument(s).
+        Instruments with calibration history will be skipped automatically.
+        This action cannot be undone.
+      </p>
+      <form method="post" action="{% url 'instruments:instrument_bulk_delete' %}">
+        {% csrf_token %}
+        <template x-for="id in selected" :key="id">
+          <input type="hidden" name="selected_ids" :value="id">
+        </template>
+        <div class="flex gap-3 mt-4">
+          <button type="submit"
+                  class="flex-1 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700">
+            Confirm Delete
+          </button>
+          <button type="button" @click="showDelete = false"
+                  class="flex-1 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50">
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Duplicate modal ─────────────────────────────────────── -->
+  <div x-show="showDuplicate" x-cloak
+       class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
+      <h3 class="text-lg font-bold text-gray-900">Duplicate Instrument</h3>
+      <p class="text-sm text-gray-500">
+        All specifications (description, manufacturer, model, category, calibration interval) will be copied.
+        Provide a unique tag and serial number for the new instrument.
+      </p>
+      <form method="post" :action="'/instruments/' + dupPk + '/duplicate/'">
+        {% csrf_token %}
+        <div class="space-y-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">New Instrument Tag <span class="text-red-500">*</span></label>
+            <input type="text" name="asset_tag" x-model="dupTag" required
+                   class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">New Serial Number <span class="text-red-500">*</span></label>
+            <input type="text" name="serial_number" x-model="dupSerial" required
+                   class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Customer</label>
+            <select name="client"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+              <option value="">Internal / No Client</option>
+              {% for c in clients %}
+              <option value="{{ c.pk }}" :selected="dupClientId == '{{ c.pk }}'">{{ c.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="flex gap-3 mt-5">
+          <button type="submit"
+                  class="flex-1 py-2 bg-green-700 text-white text-sm font-medium rounded-lg hover:bg-green-600">
+            Create Copy
+          </button>
+          <button type="button" @click="showDuplicate = false"
+                  class="flex-1 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50">
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Export modal ─────────────────────────────────────────── -->
+  <div x-show="showExport" x-cloak
+       class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50"
+       @keydown.escape.window="showExport = false">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-5" @click.away="showExport = false">
+
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-bold text-gray-900">Export Instrument List</h3>
+        <button @click="showExport = false" class="text-gray-400 hover:text-gray-600">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <div x-data="{
+        preset: 'current',
+        sort: 'tag',
+        buildUrl(format) {
+          const base = format === 'excel'
+            ? '{% url 'instruments:instrument_export_excel' %}'
+            : '{% url 'instruments:instrument_export_pdf' %}';
+          const p = new URLSearchParams();
+          if (this.preset === 'current') {
+            const cur = new URLSearchParams(window.location.search);
+            cur.forEach((v, k) => { if (k !== 'sort') p.set(k, v); });
+          } else {
+            p.set('preset', this.preset);
+          }
+          p.set('sort', this.sort);
+          return base + '?' + p.toString();
+        }
+      }" class="space-y-4">
+
+        <!-- Preset filter -->
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">Filter Preset</label>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="flex items-center gap-2 p-2.5 border rounded-lg cursor-pointer hover:bg-gray-50"
+                   :class="preset === 'current' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'">
+              <input type="radio" x-model="preset" value="current" class="text-blue-600">
+              <span class="text-sm">Current view filters</span>
+            </label>
+            <label class="flex items-center gap-2 p-2.5 border rounded-lg cursor-pointer hover:bg-gray-50"
+                   :class="preset === '' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'">
+              <input type="radio" x-model="preset" value="" class="text-blue-600">
+              <span class="text-sm">All instruments</span>
+            </label>
+            <label class="flex items-center gap-2 p-2.5 border rounded-lg cursor-pointer hover:bg-gray-50"
+                   :class="preset === 'calibrated' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'">
+              <input type="radio" x-model="preset" value="calibrated" class="text-blue-600">
+              <span class="text-sm">&#10003; Calibrated</span>
+            </label>
+            <label class="flex items-center gap-2 p-2.5 border rounded-lg cursor-pointer hover:bg-gray-50"
+                   :class="preset === 'active' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'">
+              <input type="radio" x-model="preset" value="active" class="text-blue-600">
+              <span class="text-sm">&#9679; Active / In Service</span>
+            </label>
+            <label class="flex items-center gap-2 p-2.5 border rounded-lg cursor-pointer hover:bg-gray-50"
+                   :class="preset === 'overdue' ? 'border-red-500 bg-red-50' : 'border-gray-200'">
+              <input type="radio" x-model="preset" value="overdue" class="text-blue-600">
+              <span class="text-sm text-red-700 font-medium">&#9888; Overdue</span>
+            </label>
+            <label class="flex items-center gap-2 p-2.5 border rounded-lg cursor-pointer hover:bg-gray-50"
+                   :class="preset === 'due_30' ? 'border-orange-500 bg-orange-50' : 'border-gray-200'">
+              <input type="radio" x-model="preset" value="due_30" class="text-blue-600">
+              <span class="text-sm text-orange-700">&#9200; Due in ≤ 30 days</span>
+            </label>
+            <label class="flex items-center gap-2 p-2.5 border rounded-lg cursor-pointer hover:bg-gray-50"
+                   :class="preset === 'due_60' ? 'border-yellow-500 bg-yellow-50' : 'border-gray-200'">
+              <input type="radio" x-model="preset" value="due_60" class="text-blue-600">
+              <span class="text-sm text-yellow-700">&#9200; Due in ≤ 60 days</span>
+            </label>
+            <label class="flex items-center gap-2 p-2.5 border rounded-lg cursor-pointer hover:bg-gray-50"
+                   :class="preset === 'in_calibration' ? 'border-yellow-500 bg-yellow-50' : 'border-gray-200'">
+              <input type="radio" x-model="preset" value="in_calibration" class="text-blue-600">
+              <span class="text-sm text-yellow-700">&#128201; In Calibration</span>
+            </label>
+            <label class="flex items-center gap-2 p-2.5 border rounded-lg cursor-pointer hover:bg-gray-50 col-span-2"
+                   :class="preset === 'out_of_service' ? 'border-gray-500 bg-gray-50' : 'border-gray-200'">
+              <input type="radio" x-model="preset" value="out_of_service" class="text-blue-600">
+              <span class="text-sm text-gray-600">&#215; Out of Service</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Sort -->
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1.5">Sort By</label>
+          <select x-model="sort" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+            <option value="tag">Instrument Tag</option>
+            <option value="description">Description</option>
+            <option value="client">Customer</option>
+            <option value="due_date">Next Calibration Date</option>
+            <option value="status">Status</option>
+          </select>
+        </div>
+
+        <!-- Format buttons -->
+        <div class="pt-1 flex gap-3">
+          <a :href="buildUrl('excel')"
+             @click="showExport = false"
+             class="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-700 text-white text-sm font-medium rounded-lg hover:bg-green-600 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            Download Excel (.xlsx)
+          </a>
+          <a :href="buildUrl('pdf')" target="_blank"
+             @click="showExport = false"
+             class="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-700 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+            </svg>
+            Open PDF
+          </a>
+        </div>
+
+        <p class="text-xs text-gray-400 text-center">Excel downloads automatically &middot; PDF opens in a new tab for printing</p>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /x-data -->
+{% endblock %}

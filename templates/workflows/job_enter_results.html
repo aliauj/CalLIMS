@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% load workflow_tags %}
+{% block title %}Enter Readings — {{ job.job_number }}{% endblock %}
+{% block content %}
+<div class="space-y-6" x-data="resultsForm()" x-init="init()">
+
+  <!-- Header -->
+  <div class="flex items-start justify-between">
+    <div>
+      <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">
+        <a href="{% url 'workflows:job_list' %}" class="hover:underline">Jobs</a> /
+        <a href="{% url 'workflows:job_detail' job.pk %}" class="hover:underline">{{ job.job_number }}</a> /
+        Enter Readings
+      </p>
+      <h2 class="text-2xl font-bold text-gray-900">Enter Calibration Readings</h2>
+      <p class="text-sm text-gray-500 mt-0.5">{{ job.instrument }} &mdash; {{ job.method }}</p>
+    </div>
+    <a href="{% url 'workflows:job_detail' job.pk %}" class="px-4 py-2 border border-gray-300 text-sm rounded-lg text-gray-700 hover:bg-gray-50">← Back to Job</a>
+  </div>
+
+  {% if not points %}
+  <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-5 text-sm text-yellow-800">
+    <strong>No calibration points defined</strong> for method <em>{{ job.method.code }}</em>.
+    Ask an administrator to define the calibration points for this method before entering results.
+    <a href="{% url 'administration:method_list' %}" class="underline ml-1">Go to Admin → Methods</a>.
+  </div>
+  {% else %}
+
+  <form method="post" action="{% url 'workflows:job_enter_results' job.pk %}">
+    {% csrf_token %}
+
+    <!-- Conditions & Reference Standard -->
+    <div class="bg-white rounded-xl shadow p-6 space-y-5 mb-6">
+      <h3 class="font-semibold text-gray-900 border-b pb-2">Setup</h3>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Reference Standard <span class="text-red-500">*</span>
+          </label>
+          <select name="reference_standard" required
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+            <option value="">— select standard —</option>
+            {% for std in active_standards %}
+            <option value="{{ std.pk }}">{{ std.serial_number }} — {{ std.name }} (U=±{{ std.uncertainty_value }} {{ std.uncertainty_unit.symbol }})</option>
+            {% endfor %}
+          </select>
+          {% if not active_standards %}
+          <p class="text-xs text-red-500 mt-1">No active reference standards. Add one in <a href="{% url 'standards:standard_list' %}" class="underline">Standards</a>.</p>
+          {% endif %}
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Lab Temperature (°C)</label>
+          <input type="number" step="0.1" name="temperature_c"
+                 value="{{ job.temperature_c|default:'' }}" placeholder="23.0"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Lab Humidity (%RH)</label>
+          <input type="number" step="0.1" name="humidity_pct"
+                 value="{{ job.humidity_pct|default:'' }}" placeholder="50.0"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-blue-500">
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Calibration Points Data Entry -->
+    <div class="bg-white rounded-xl shadow overflow-hidden mb-6">
+      <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+        <h3 class="font-semibold text-gray-900">Calibration Points</h3>
+        <p class="text-xs text-gray-500 mt-0.5">Enter the DUT (Device Under Test) reading at each nominal set point. Error and pass/fail are shown instantly.</p>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th class="px-4 py-3 text-left font-medium text-gray-600 w-8">#</th>
+              <th class="px-4 py-3 text-left font-medium text-gray-600">Label / Parameter</th>
+              <th class="px-4 py-3 text-right font-medium text-gray-600">Nominal Value</th>
+              <th class="px-4 py-3 text-center font-medium text-blue-700 w-48">DUT Reading <span class="font-normal text-xs">(enter here)</span></th>
+              <th class="px-4 py-3 text-right font-medium text-gray-600">Error</th>
+              <th class="px-4 py-3 text-right font-medium text-gray-600">Tolerance</th>
+              <th class="px-4 py-3 text-center font-medium text-gray-600">Result</th>
+              <th class="px-4 py-3 text-left font-medium text-gray-600">Unit</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            {% for point in points %}
+            {% with prev=existing|get_item:point.sequence %}
+            <tr x-data="{
+                  nominal: {{ point.nominal_value }},
+                  measured: '{{ prev.measured_value|default:'' }}',
+                  tolPos: {% if point.tolerance_positive %}{{ point.tolerance_positive }}{% else %}null{% endif %},
+                  tolNeg: {% if point.tolerance_negative %}-{{ point.tolerance_negative }}{% else %}null{% endif %},
+                  get error() {
+                    let v = parseFloat(this.measured);
+                    return isNaN(v) ? null : (v - this.nominal);
+                  },
+                  get passFail() {
+                    if (this.error === null) return null;
+                    if (this.tolPos === null && this.tolNeg === null) return null;
+                    let tp = this.tolPos ?? Math.abs(this.tolNeg ?? 0);
+                    let tn = this.tolNeg ?? -tp;
+                    return this.error >= tn && this.error <= tp;
+                  }
+                }"
+                :class="passFail === false ? 'bg-red-50' : passFail === true ? 'bg-green-50' : ''">
+
+              <td class="px-4 py-3 text-gray-400 font-mono">{{ point.sequence }}</td>
+
+              <td class="px-4 py-3">
+                <p class="font-medium text-gray-900">{{ point.label }}</p>
+              </td>
+
+              <td class="px-4 py-3 text-right font-mono font-semibold text-gray-700">
+                {{ point.nominal_value }}<span class="text-gray-400 font-normal ml-1 text-xs">{{ point.unit.symbol }}</span>
+              </td>
+
+              <td class="px-4 py-3 text-center">
+                <input type="number" step="any"
+                       name="measured_{{ point.pk }}"
+                       x-model="measured"
+                       placeholder="0.000000"
+                       class="w-36 border-2 border-blue-300 rounded-lg px-3 py-1.5 text-sm font-mono text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                       :class="passFail === false ? 'border-red-400 bg-red-50' : passFail === true ? 'border-green-400 bg-green-50' : ''">
+              </td>
+
+              <td class="px-4 py-3 text-right font-mono"
+                  :class="error === null ? 'text-gray-300' : error < 0 ? 'text-orange-600' : 'text-gray-700'">
+                <span x-text="error !== null ? (error >= 0 ? '+' : '') + error.toFixed(6) : '—'"></span>
+              </td>
+
+              <td class="px-4 py-3 text-right font-mono text-gray-500">
+                {% if point.tolerance_positive or point.tolerance_negative %}
+                  +{{ point.tolerance_positive|default:point.tolerance_negative }} /
+                  -{{ point.tolerance_negative|default:point.tolerance_positive }}
+                {% else %}
+                  <span class="text-gray-300">none</span>
+                {% endif %}
+              </td>
+
+              <td class="px-4 py-3 text-center font-bold text-sm">
+                <span x-show="passFail === true" class="text-green-700">PASS</span>
+                <span x-show="passFail === false" class="text-red-700">FAIL</span>
+                <span x-show="passFail === null" class="text-gray-300">—</span>
+              </td>
+
+              <td class="px-4 py-3 text-gray-500 text-xs">{{ point.unit.symbol }}</td>
+
+            </tr>
+            {% endwith %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Note about uncertainty -->
+    <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 text-xs text-blue-700 mb-6">
+      <strong>Uncertainty:</strong> Combined uncertainty is calculated automatically from the uncertainty contributors defined for method <em>{{ job.method.code }}</em>
+      (k = {{ job.method.coverage_factor }}, confidence = {{ job.method.confidence_level }}%)
+      plus the selected reference standard's certificate uncertainty.
+    </div>
+
+    <div class="flex gap-3">
+      <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
+        Save Results
+      </button>
+      <a href="{% url 'workflows:job_detail' job.pk %}" class="px-6 py-2.5 border border-gray-300 text-sm rounded-lg text-gray-700 hover:bg-gray-50">
+        Cancel
+      </a>
+    </div>
+
+  </form>
+  {% endif %}
+
+</div>
+
+<script>
+function resultsForm() {
+  return {
+    init() {}
+  }
+}
+</script>
+{% endblock %}

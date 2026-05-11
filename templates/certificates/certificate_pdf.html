@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page { size: A4; margin: 20mm 15mm; }
+  body { font-family: Arial, sans-serif; font-size: 10pt; color: #1a1a2e; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #1e3a8a; padding-bottom: 12px; margin-bottom: 16px; }
+  .lab-name { font-size: 20pt; font-weight: bold; color: #1e3a8a; }
+  .cert-title { font-size: 14pt; font-weight: bold; text-align: center; color: #1e3a8a; margin: 16px 0 8px; }
+  .cert-number { text-align: center; font-size: 11pt; color: #64748b; margin-bottom: 16px; }
+  .section { margin-bottom: 14px; }
+  .section-title { font-size: 9pt; font-weight: bold; text-transform: uppercase; color: #64748b; border-bottom: 1px solid #e2e8f0; padding-bottom: 3px; margin-bottom: 8px; letter-spacing: 0.05em; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
+  .field-label { font-size: 8pt; color: #94a3b8; }
+  .field-value { font-size: 9.5pt; font-weight: 500; }
+  table { width: 100%; border-collapse: collapse; font-size: 8.5pt; margin-top: 6px; }
+  th { background: #1e3a8a; color: white; padding: 5px 8px; text-align: left; font-weight: 600; }
+  th.right, td.right { text-align: right; }
+  th.center, td.center { text-align: center; }
+  td { padding: 4px 8px; border-bottom: 1px solid #f1f5f9; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .pass { color: #16a34a; font-weight: bold; }
+  .fail { color: #dc2626; font-weight: bold; }
+  .declaration { font-size: 8.5pt; color: #334155; background: #f1f5f9; border-left: 3px solid #1e3a8a; padding: 8px 12px; margin-bottom: 14px; line-height: 1.5; }
+  .remarks { font-size: 8.5pt; color: #475569; background: #fffbeb; border-left: 3px solid #f59e0b; padding: 8px 12px; margin-bottom: 14px; line-height: 1.5; }
+  .signature-section { display: flex; justify-content: space-between; margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; }
+  .signature-box { width: 45%; }
+  .signature-line { border-top: 1px solid #94a3b8; margin-top: 32px; padding-top: 4px; font-size: 8pt; color: #64748b; }
+  .footer { margin-top: 20px; padding-top: 8px; border-top: 1px solid #e2e8f0; font-size: 7.5pt; color: #94a3b8; display: flex; justify-content: space-between; }
+  .status-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 8pt; font-weight: bold; background: #dcfce7; color: #15803d; }
+  .traceability { font-size: 8pt; color: #475569; background: #f8fafc; padding: 8px; border-radius: 4px; }
+  .logo-block { display: flex; align-items: center; gap: 10px; }
+  .logo-img { max-height: 56px; max-width: 160px; object-fit: contain; }
+  .lab-text { display: flex; flex-direction: column; justify-content: center; }
+  .scope-tag { font-size: 7pt; color: #64748b; margin-top: 2px; font-style: italic; }
+
+  /* ── Calibration sticker page ── */
+  @page sticker-page {
+    size: 75mm 50mm;
+    margin: 1.5mm;
+  }
+  .sticker-page {
+    page: sticker-page;
+    page-break-before: always;
+    font-family: Arial, sans-serif;
+    color: #111;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    border: 0.3mm solid #ccc;
+    border-radius: 1mm;
+    overflow: hidden;
+  }
+  /* green left accent bar + content area */
+  .sk-outer { display: table; width: 100%; height: 100%; }
+  .sk-accent { display: table-cell; width: 2.5mm; background: #16a34a; vertical-align: top; }
+  .sk-body   { display: table-cell; vertical-align: top; padding: 1mm 1.5mm; }
+  /* top bar: badge + lab name */
+  .sk-topbar { display: table; width: 100%; margin-bottom: 0.8mm; }
+  .sk-badge  {
+    display: table-cell; vertical-align: middle;
+    background: #16a34a; color: #fff;
+    font-size: 6.5pt; font-weight: bold;
+    padding: 0.2mm 1.2mm; border-radius: 0.5mm;
+    white-space: nowrap; width: 1%;
+  }
+  .sk-labname {
+    display: table-cell; vertical-align: middle;
+    font-size: 5pt; color: #555; padding-left: 1.5mm;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  /* main area: QR left, table right */
+  .sk-main  { display: table; width: 100%; }
+  .sk-qr    { display: table-cell; vertical-align: middle; width: 20mm; padding-right: 1.5mm; }
+  .sk-qr img { display: block; width: 18mm; height: 18mm; }
+  .sk-info  { display: table-cell; vertical-align: top; }
+  /* info table */
+  .sk-table { width: 100%; border-collapse: collapse; font-size: 5.5pt; }
+  .sk-table tr { border-bottom: 0.15mm solid #e5e7eb; }
+  .sk-table tr:last-child { border-bottom: none; }
+  .sk-table td { padding: 0.4mm 0; line-height: 1.3; }
+  .sk-table td.lbl { color: #6b7280; width: 30%; white-space: nowrap; }
+  .sk-table td.val { font-weight: 600; color: #111; word-break: break-word; }
+  .sk-due-overdue { color: #dc2626; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <!-- Left: logo + lab identity -->
+  <div class="logo-block">
+    {% if logo_b64 %}
+    <img class="logo-img" src="data:{{ logo_mime }};base64,{{ logo_b64 }}" alt="Lab logo">
+    {% endif %}
+    <div class="lab-text">
+      <div class="lab-name">{% if lab_settings %}{{ lab_settings.lab_name }}{% else %}CalLIMS{% endif %}</div>
+      {% if lab_settings and lab_settings.lab_subtitle %}
+      <div style="font-size:8pt; color:#64748b;">{{ lab_settings.lab_subtitle }}</div>
+      {% endif %}
+      {% if lab_settings and lab_settings.accreditation_scope %}
+      <div class="scope-tag">{{ lab_settings.accreditation_scope }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Right: accreditation text + date + QR -->
+  <div style="text-align:right; font-size:8pt; color:#64748b;">
+    {% if lab_settings and lab_settings.accreditation_text %}
+    <div style="font-weight:600; color:#1e3a8a;">{{ lab_settings.accreditation_text }}</div>
+    {% endif %}
+    <div>Generated: {{ generated_at|date:"M d, Y H:i" }}</div>
+    {% if qr_b64 %}
+    <img src="data:image/png;base64,{{ qr_b64 }}" width="60" height="60" style="margin-top:4px;">
+    {% elif cert.qr_code %}
+    <img src="{{ cert.qr_code.path }}" width="60" height="60" style="margin-top:4px;">
+    {% endif %}
+  </div>
+</div>
+
+<div class="cert-title">CALIBRATION CERTIFICATE</div>
+<div class="cert-number">{{ cert.certificate_number }} &nbsp;|&nbsp; <span class="status-badge">{{ cert.get_status_display }}</span></div>
+
+<div class="section">
+  <div class="section-title">Instrument Under Calibration</div>
+  <div class="grid-2">
+    <div><div class="field-label">Asset Tag</div><div class="field-value" style="font-family:monospace;">{{ cert.job.instrument.asset_tag }}</div></div>
+    <div><div class="field-label">Serial Number</div><div class="field-value">{{ cert.job.instrument.serial_number }}</div></div>
+    <div><div class="field-label">Description</div><div class="field-value">{{ cert.job.instrument.description }}</div></div>
+    <div><div class="field-label">Manufacturer</div><div class="field-value">{{ cert.job.instrument.manufacturer|default:"—" }}</div></div>
+    <div><div class="field-label">Model</div><div class="field-value">{{ cert.job.instrument.model_number|default:"—" }}</div></div>
+    <div><div class="field-label">Client</div><div class="field-value">{{ cert.job.instrument.client|default:"Internal" }}</div></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">Calibration Details</div>
+  <div class="grid-2">
+    <div><div class="field-label">Job Number</div><div class="field-value">{{ cert.job.job_number }}</div></div>
+    <div><div class="field-label">Calibration Method</div><div class="field-value">{{ cert.job.method }}</div></div>
+    <div><div class="field-label">Issue Date</div><div class="field-value">{{ cert.issue_date|date:"M d, Y"|default:"—" }}</div></div>
+    <div><div class="field-label">Valid Until</div><div class="field-value">{{ cert.expiry_date|date:"M d, Y"|default:"—" }}</div></div>
+    <div><div class="field-label">Temperature</div><div class="field-value">{{ cert.job.temperature_c|default:"—" }}{% if cert.job.temperature_c %} °C{% endif %}</div></div>
+    <div><div class="field-label">Humidity</div><div class="field-value">{{ cert.job.humidity_pct|default:"—" }}{% if cert.job.humidity_pct %} %{% endif %}</div></div>
+  </div>
+</div>
+
+{% if results %}
+<div class="section">
+  <div class="section-title">Measurement Results</div>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Parameter</th>
+        <th class="right">Nominal</th>
+        <th class="right">Measured</th>
+        <th class="right">Error</th>
+        <th class="right">u (std)</th>
+        <th class="center">k</th>
+        <th class="right">U (expanded)</th>
+        <th>Unit</th>
+        <th class="center">Result</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in results %}
+      <tr>
+        <td>{{ r.sequence }}</td>
+        <td>{{ r.parameter }}</td>
+        <td class="right">{{ r.nominal_value|default:"—" }}</td>
+        <td class="right"><strong>{{ r.measured_value }}</strong></td>
+        <td class="right">{{ r.error|default:"—" }}</td>
+        <td class="right">{{ r.standard_uncertainty }}</td>
+        <td class="center">{{ r.coverage_factor_k }}</td>
+        <td class="right">± {{ r.expanded_uncertainty }}</td>
+        <td>{{ r.unit.symbol }}</td>
+        <td class="center">
+          {% if r.pass_fail %}<span class="pass">PASS</span>
+          {% elif r.pass_fail is False %}<span class="fail">FAIL</span>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if results %}
+{% with results.0.reference_standard as ref_std %}
+{% if ref_std %}
+<div class="section">
+  <div class="section-title">Reference Standard &amp; Traceability</div>
+  <div class="traceability">
+    <strong>{{ ref_std.serial_number }}</strong> — {{ ref_std.name }}<br>
+    Standard Uncertainty: {{ ref_std.uncertainty_value }} {{ ref_std.uncertainty_unit.symbol }} (k=1)<br>
+    Certificate: {{ ref_std.certificate_number }} | Issued By: {{ ref_std.issued_by }}<br>
+    Valid Until: {{ ref_std.calibration_due_date|date:"M d, Y" }}
+    {% if ref_std.traceability_chain %}
+    <br><br><strong>Traceability Chain to SI:</strong>
+    {% for link in ref_std.traceability_chain %}
+    <br>&nbsp;&nbsp;{{ forloop.counter }}. {{ link.issuing_body }} — Cert: {{ link.cert_number }} ({{ link.date }})
+    {% endfor %}
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endwith %}
+{% endif %}
+
+{% if lab_settings and lab_settings.declaration_statement %}
+<div class="declaration">{{ lab_settings.declaration_statement }}</div>
+{% endif %}
+
+{% if cert.notes %}
+<div class="section">
+  <div class="section-title">Remarks</div>
+  <div class="remarks">{{ cert.notes }}</div>
+</div>
+{% endif %}
+
+<div class="signature-section">
+  <div class="signature-box">
+    <div class="signature-line">Performed By / Technician</div>
+    {% if cert.job.assigned_to %}
+    <div style="font-size:8pt; margin-top:2px;">{{ cert.job.assigned_to.get_full_name }}</div>
+    {% endif %}
+  </div>
+  <div class="signature-box" style="text-align:right;">
+    <div class="signature-line">Approved &amp; Signed By</div>
+    {% if cert.signed_by %}
+    <div style="font-size:8pt; margin-top:2px;">{{ cert.signed_by.get_full_name }}</div>
+    <div style="font-size:7.5pt; color:#94a3b8;">{{ cert.signed_at|date:"M d, Y H:i" }}</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="footer">
+  <div>
+    Certificate Hash (SHA-256): <span style="font-family:monospace;">{{ cert.content_hash|default:"—"|truncatechars:32 }}</span>
+    {% if lab_settings and lab_settings.footer_text %}&nbsp;&nbsp;|&nbsp;&nbsp;{{ lab_settings.footer_text }}{% endif %}
+  </div>
+  <div>Page 1 of 1</div>
+</div>
+
+{% if not lab_settings or lab_settings.include_sticker %}
+<div class="sticker-page">
+  <div class="sk-outer">
+    <div class="sk-accent"></div>
+    <div class="sk-body">
+
+      <!-- Top bar: CALIBRATED badge + lab name -->
+      <div class="sk-topbar">
+        <span class="sk-badge">CALIBRATED</span>
+        <span class="sk-labname">{% if lab_settings %}{{ lab_settings.lab_name }}{% else %}CalLIMS{% endif %}</span>
+      </div>
+
+      <!-- Main content: QR + info table -->
+      <div class="sk-main">
+
+        <!-- QR code -->
+        <div class="sk-qr">
+          {% if qr_b64 %}
+          <img src="data:image/png;base64,{{ qr_b64 }}" alt="QR">
+          {% endif %}
+        </div>
+
+        <!-- Info table -->
+        <div class="sk-info">
+          <table class="sk-table">
+            <tr>
+              <td class="lbl">Cert&nbsp;No</td>
+              <td class="val">{{ cert.certificate_number }}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Desc</td>
+              <td class="val">{{ cert.job.instrument.description|truncatechars:28 }}</td>
+            </tr>
+            <tr>
+              <td class="lbl">S/N</td>
+              <td class="val">{{ cert.job.instrument.serial_number }}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Cal&nbsp;Date</td>
+              <td class="val">{{ cert.issue_date|date:"d M Y"|default:"—" }}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Due&nbsp;Date</td>
+              <td class="val {% if cert.expiry_date and cert.expiry_date < generated_at.date %}sk-due-overdue{% endif %}">
+                {{ cert.expiry_date|date:"d M Y"|default:"—" }}
+              </td>
+            </tr>
+          </table>
+        </div>
+
+      </div><!-- /sk-main -->
+    </div><!-- /sk-body -->
+  </div><!-- /sk-outer -->
+</div><!-- /sticker-page -->
+{% endif %}
+
+</body>
+</html>

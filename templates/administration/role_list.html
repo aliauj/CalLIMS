@@ -1,0 +1,117 @@
+{% extends "administration/base_admin.html" %}
+{% block title %}Role Management — CalLIMS Admin{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <div class="flex justify-between items-center">
+    <div>
+      <h2 class="text-2xl font-bold text-gray-900">Role Management</h2>
+      <p class="text-sm text-gray-500 mt-0.5">Built-in roles are fixed; custom roles can be freely defined.</p>
+    </div>
+    <a href="{% url 'administration:role_create' %}" class="bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">+ New Role</a>
+  </div>
+
+  <!-- Built-in Roles -->
+  <div class="bg-white rounded-xl shadow overflow-hidden">
+    <div class="px-5 py-3 border-b border-gray-100 bg-gray-50">
+      <h3 class="font-semibold text-gray-700 text-sm">Built-in System Roles</h3>
+      <p class="text-xs text-gray-400 mt-0.5">These roles are hard-wired to system behaviour (FSM transitions, nav access, review permissions). Their names cannot be changed.</p>
+    </div>
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b border-gray-100">
+        <tr>
+          <th class="px-5 py-3 text-left font-medium text-gray-600">Code</th>
+          <th class="px-5 py-3 text-left font-medium text-gray-600">Display Name</th>
+          <th class="px-5 py-3 text-left font-medium text-gray-600">System Capabilities</th>
+          <th class="px-5 py-3 text-right font-medium text-gray-600">Users</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        {% for r in built_in_roles %}
+        <tr class="hover:bg-gray-50">
+          <td class="px-5 py-3 font-mono text-xs font-semibold text-gray-700">{{ r.code }}</td>
+          <td class="px-5 py-3">
+            <span class="px-2 py-1 rounded-full text-xs font-medium
+              {% if r.code == 'ADMIN' %}bg-purple-100 text-purple-800
+              {% elif r.code == 'MANAGER' %}bg-blue-100 text-blue-800
+              {% elif r.code == 'TECHNICIAN' %}bg-green-100 text-green-800
+              {% elif r.code == 'REVIEWER' %}bg-indigo-100 text-indigo-800
+              {% elif r.code == 'AUDITOR' %}bg-yellow-100 text-yellow-800
+              {% elif r.code == 'CLIENT' %}bg-orange-100 text-orange-800
+              {% else %}bg-gray-100 text-gray-700{% endif %}">
+              {{ r.name }}
+            </span>
+          </td>
+          <td class="px-5 py-3 text-xs text-gray-500">
+            {% if r.code == 'ADMIN' %}Full access — all actions, admin panel{% endif %}
+            {% if r.code == 'MANAGER' %}Admin panel access, job assignment, approval{% endif %}
+            {% if r.code == 'TECHNICIAN' %}Run calibration jobs, enter measurements{% endif %}
+            {% if r.code == 'REVIEWER' %}Approve/reject jobs under review{% endif %}
+            {% if r.code == 'AUDITOR' %}Read-only lab access{% endif %}
+            {% if r.code == 'CLIENT' %}Client portal — own instruments &amp; certificates only{% endif %}
+          </td>
+          <td class="px-5 py-3 text-right text-gray-700 font-semibold">{{ r.count }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Custom Roles -->
+  <div class="bg-white rounded-xl shadow overflow-hidden">
+    <div class="px-5 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+      <div>
+        <h3 class="font-semibold text-gray-700 text-sm">Custom Roles</h3>
+        <p class="text-xs text-gray-400 mt-0.5">Custom roles inherit the module permission system — configure per-user permissions on the user detail page.</p>
+      </div>
+    </div>
+    {% if custom_roles %}
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b border-gray-100">
+        <tr>
+          <th class="px-5 py-3 text-left font-medium text-gray-600">Code</th>
+          <th class="px-5 py-3 text-left font-medium text-gray-600">Name</th>
+          <th class="px-5 py-3 text-left font-medium text-gray-600">Description</th>
+          <th class="px-5 py-3 text-center font-medium text-gray-600">Lab Access</th>
+          <th class="px-5 py-3 text-right font-medium text-gray-600">Users</th>
+          <th class="px-5 py-3 text-left font-medium text-gray-600">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        {% for r in custom_roles %}
+        <tr class="hover:bg-gray-50">
+          <td class="px-5 py-3 font-mono text-xs font-semibold text-gray-700">{{ r.code }}</td>
+          <td class="px-5 py-3">
+            <span class="px-2 py-1 rounded-full text-xs font-medium bg-teal-100 text-teal-800">{{ r.name }}</span>
+          </td>
+          <td class="px-5 py-3 text-gray-500 text-xs">{{ r.description|default:"—"|truncatechars:60 }}</td>
+          <td class="px-5 py-3 text-center">
+            {% if r.is_lab_staff %}
+            <span class="text-green-600 text-xs font-medium">&#10003; Yes</span>
+            {% else %}
+            <span class="text-gray-400 text-xs">Portal only</span>
+            {% endif %}
+          </td>
+          <td class="px-5 py-3 text-right font-semibold text-gray-700">{{ r.user_count }}</td>
+          <td class="px-5 py-3">
+            <div class="flex gap-3">
+              <a href="{% url 'administration:role_edit' r.pk %}" class="text-blue-600 hover:underline text-xs font-medium">Edit</a>
+              <form method="post" action="{% url 'administration:role_delete' r.pk %}" onsubmit="return confirm('Delete role \'{{ r.name }}\'? This cannot be undone.')">
+                {% csrf_token %}
+                <button type="submit" class="text-red-600 hover:underline text-xs font-medium">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="px-5 py-10 text-center text-gray-400 text-sm">
+      No custom roles yet.
+      <a href="{% url 'administration:role_create' %}" class="text-blue-600 hover:underline ml-1">Create one →</a>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
