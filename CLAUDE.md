@@ -14,7 +14,7 @@ sudo bash install.sh --skip-nginx                   # skip Nginx setup
 sudo bash install.sh --skip-firewall                # skip ufw/firewalld
 ```
 
-The installer: detects the distro, installs Python 3.11+/PostgreSQL 16/Redis/Nginx, creates a `callims` system user, sets up `/opt/callims`, writes `/opt/callims/.env` with generated secrets, runs migrations, prompts for a superuser, creates systemd services (`callims-web`, `callims-worker`, `callims-beat`), configures Nginx, and generates the first license key.
+The installer: detects the distro, installs Python 3.11+/PostgreSQL 16/Redis/Nginx, creates a `callims` system user with home at `/home/callims` (nologin shell), sets up `/home/callims/app`, writes `/home/callims/app/.env` with generated secrets, runs migrations, prompts for a superuser, creates systemd services (`callims-web`, `callims-worker`, `callims-beat`), configures Nginx, and generates the first license key.
 
 ## Commands
 

@@ -8,7 +8,7 @@
 #    Red Hat family — RHEL 8/9, Rocky Linux 8/9, AlmaLinux 8/9, Fedora 38+
 #
 #  Usage:
-#    sudo bash install.sh [--domain example.com] [--app-dir /opt/callims]
+#    sudo bash install.sh [--domain example.com] [--app-dir /home/callims/app]
 #                         [--db-name callims_db] [--skip-nginx] [--skip-firewall]
 # =============================================================================
 
@@ -18,7 +18,8 @@ IFS=$'\n\t'
 # ── Defaults (override with CLI flags) ────────────────────────────────────────
 CALLIMS_VERSION="1.0"
 APP_USER="callims"
-APP_DIR="/opt/callims"
+APP_HOME="/home/callims"
+APP_DIR="${APP_HOME}/app"
 DB_NAME="callims_db"
 DB_USER="callims_db_user"
 DOMAIN="_"          # Nginx server_name; use _ for catch-all or set --domain
@@ -299,9 +300,15 @@ setup_app_user() {
   if id "$APP_USER" &>/dev/null; then
     warn "User '$APP_USER' already exists. Skipping creation."
   else
-    useradd --system --no-create-home --shell /usr/sbin/nologin "$APP_USER"
+    useradd --system --create-home --home-dir "$APP_HOME" --shell /usr/sbin/nologin "$APP_USER"
     success "User '$APP_USER' created."
   fi
+
+  # Ensure the home dir exists and is owned by the app user — covers the case
+  # where the user was created on a previous install with --no-create-home.
+  mkdir -p "$APP_HOME"
+  chown "$APP_USER":"$APP_USER" "$APP_HOME"
+  chmod 750 "$APP_HOME"
 }
 
 setup_app_directory() {
