@@ -114,25 +114,41 @@ install_debian_packages() {
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -qq
 
-  # Python — target 3.11; on older releases use deadsnakes PPA
-  if [[ "$DISTRO_ID" == "ubuntu" && "$DISTRO_MAJOR" == "20" ]]; then
-    info "Ubuntu 20.04 detected — adding deadsnakes PPA for Python 3.11"
-    apt-get install -y -qq software-properties-common
-    add-apt-repository -y ppa:deadsnakes/ppa
-    apt-get update -qq
-  elif [[ "$DISTRO_ID" == "debian" && "$DISTRO_MAJOR" == "11" ]]; then
-    info "Debian 11 detected — adding backports for Python 3.11"
-    echo "deb http://deb.debian.org/debian bullseye-backports main" \
-      >> /etc/apt/sources.list.d/backports.list
-    apt-get update -qq
-    # Install from backports with explicit -t flag handled below
-  fi
+  # Python — pick a package set per distro release
+  PY_PKGS=()
+  case "$DISTRO_ID:$DISTRO_MAJOR" in
+    ubuntu:20|ubuntu:22)
+      info "Ubuntu ${DISTRO_VERSION} detected — adding deadsnakes PPA for Python 3.11"
+      apt-get install -y -qq software-properties-common
+      add-apt-repository -y ppa:deadsnakes/ppa
+      apt-get update -qq
+      PY_PKGS=(python3.11 python3.11-dev python3.11-venv python3.11-distutils)
+      ;;
+    ubuntu:24|ubuntu:25)
+      info "Ubuntu ${DISTRO_VERSION} detected — using system Python 3.12"
+      PY_PKGS=(python3.12 python3.12-dev python3.12-venv)
+      ;;
+    debian:11)
+      info "Debian 11 detected — adding backports for Python 3.11"
+      echo "deb http://deb.debian.org/debian bullseye-backports main" \
+        >> /etc/apt/sources.list.d/backports.list
+      apt-get update -qq
+      PY_PKGS=(python3.11 python3.11-dev python3.11-venv)
+      ;;
+    debian:12)
+      PY_PKGS=(python3.11 python3.11-dev python3.11-venv)
+      ;;
+    *)
+      info "Unrecognized Debian/Ubuntu release ${DISTRO_VERSION} — falling back to default python3"
+      PY_PKGS=(python3 python3-dev python3-venv)
+      ;;
+  esac
 
   DEBIAN_PKGS=(
     # Build tools
     build-essential gcc curl wget gnupg2 ca-certificates lsb-release
-    # Python
-    python3.11 python3.11-dev python3.11-venv python3.11-distutils
+    # Python (chosen above per distro)
+    "${PY_PKGS[@]}"
     # PostgreSQL client libs (for psycopg)
     libpq-dev
     # WeasyPrint system dependencies
@@ -146,9 +162,9 @@ install_debian_packages() {
   )
 
   if [[ "$DISTRO_ID" == "debian" && "$DISTRO_MAJOR" == "11" ]]; then
-    apt-get install -y -qq -t bullseye-backports python3.11 python3.11-dev python3.11-venv
+    apt-get install -y -qq -t bullseye-backports "${PY_PKGS[@]}"
     # Install rest from main
-    PKGS_NO_PY=("${DEBIAN_PKGS[@]/python3.11*/}")
+    PKGS_NO_PY=("${DEBIAN_PKGS[@]/python3*/}")
     apt-get install -y -qq "${PKGS_NO_PY[@]}" 2>/dev/null || true
   else
     apt-get install -y -qq "${DEBIAN_PKGS[@]}" 2>/dev/null || \
@@ -347,9 +363,14 @@ setup_database() {
 
   DB_PASSWORD="$(gen_pass)"
 
-  # Create role if it doesn't exist
-  sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='$DB_USER'" | grep -q 1 || \
+  # Create role if it doesn't exist; either way, reset the password to the freshly
+  # generated value so it matches what we'll write to .env. Without the ALTER on
+  # re-runs, .env drifts out of sync with PG and Django can't connect.
+  if sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='$DB_USER'" | grep -q 1; then
+    sudo -u postgres psql -c "ALTER USER $DB_USER WITH PASSWORD '$DB_PASSWORD';"
+  else
     sudo -u postgres psql -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASSWORD';"
+  fi
 
   # Create database if it doesn't exist
   sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='$DB_NAME'" | grep -q 1 || \

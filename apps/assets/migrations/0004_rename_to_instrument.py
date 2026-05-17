@@ -8,6 +8,10 @@ class Migration(migrations.Migration):
     dependencies = [
         ('assets', '0003_initial'),
         ('clients', '0001_initial'),
+        # Force all workflows migrations written under the old "equipment" name
+        # to apply before this rename, so workflows/0001_initial's FK to
+        # 'assets.equipment' can resolve on fresh installs.
+        ('workflows', '0003_method_certificate_template'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
