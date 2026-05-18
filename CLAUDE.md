@@ -10,11 +10,14 @@ sudo bash install.sh
 
 # With optional flags:
 sudo bash install.sh --domain callims.example.com   # set Nginx server_name
+sudo bash install.sh --enable-https                 # generate self-signed cert, serve HTTPS on :443
 sudo bash install.sh --skip-nginx                   # skip Nginx setup
 sudo bash install.sh --skip-firewall                # skip ufw/firewalld
 ```
 
-The installer: detects the distro, installs Python 3.11+/PostgreSQL 16/Redis/Nginx, creates a `callims` system user with home at `/home/callims` (nologin shell), sets up `/home/callims/app`, writes `/home/callims/app/.env` with generated secrets, runs migrations, prompts for a superuser, creates systemd services (`callims-web`, `callims-worker`, `callims-beat`), configures Nginx, and generates the first license key.
+The installer: detects the distro, installs Python (3.12 on Ubuntu 24.04+, 3.11 elsewhere via deadsnakes/backports) plus PostgreSQL 16/Redis/Nginx, creates a `callims` system user with home at `/home/callims` (nologin shell), sets up `/home/callims/app`, writes `/home/callims/app/.env` with generated secrets, runs migrations, prompts for a superuser, creates systemd services (`callims-web`, `callims-worker`, `callims-beat`), configures Nginx (with self-signed TLS at `/etc/ssl/callims/` if `--enable-https`), and generates the first license key.
+
+**Re-running the installer is safe.** It preserves `SECRET_KEY` (sessions stay valid) and `LICENSE_SECRET_KEY` (previously-issued license keys keep verifying) from the existing `.env`, generating fresh secrets only on a first install. It also resets the PG user's password to match the new `.env` so DB auth stays consistent. `ALLOWED_HOSTS` is auto-built from `localhost`, `127.0.0.1`, the detected server IP, the system hostname, and `--domain` (if provided); never edit this manually unless adding extra aliases.
 
 ## Commands
 
@@ -49,6 +52,20 @@ celery -A config beat -l info
 ```
 
 The settings module is `config.settings.development` (set in `manage.py`). No `.env` file is needed for local dev — defaults are wired into `config/settings/development.py`.
+
+**Running `manage.py` on a production server**: `manage.py` hardcodes the dev settings module, and dev settings include `debug_toolbar`, which is **not** in `requirements/production.txt`. Any `manage.py` command on a prod box will crash with `ModuleNotFoundError: No module named 'debug_toolbar'` unless you override the env var. Use:
+```bash
+sudo -u callims env DJANGO_SETTINGS_MODULE=config.settings.production \
+  /home/callims/app/venv/bin/python /home/callims/app/manage.py <command>
+```
+The systemd units already export `DJANGO_SETTINGS_MODULE=config.settings.production` via `EnvironmentFile=` so gunicorn/celery work fine — this gotcha only bites interactive shell/management commands.
+
+### Production operations
+
+- **Gunicorn logs**: `/home/callims/app/logs/gunicorn_access.log` and `gunicorn_error.log`. Application tracebacks land in `gunicorn_error.log`, **not** in `journalctl -u callims-web` (journal only shows startup banners).
+- **Nginx logs**: `/var/log/nginx/callims_access.log` and `callims_error.log`.
+- **Debugging 500s**: there's no `LOGGING` config wired into Django settings, so unhandled exceptions in production are swallowed (Django would normally email `ADMINS`, but SMTP isn't configured by default). The fastest path to see a traceback is to flip `DEBUG=True` in `/home/callims/app/.env`, restart `callims-web`, reproduce, then revert. **Don't leave DEBUG=True on** — it leaks settings and source paths on every error page.
+- **Manual cert regeneration** (when `--enable-https` was used): delete `/etc/ssl/callims/{cert,key}.pem` and re-run the installer; otherwise existing certs are reused.
 
 ## Architecture
 
