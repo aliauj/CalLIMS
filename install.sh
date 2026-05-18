@@ -9,6 +9,7 @@
 #
 #  Usage:
 #    sudo bash install.sh [--domain example.com] [--app-dir /home/callims/app]
+#                         [--enable-https]
 #                         [--db-name callims_db] [--skip-nginx] [--skip-firewall]
 # =============================================================================
 
@@ -23,6 +24,7 @@ APP_DIR="${APP_HOME}/app"
 DB_NAME="callims_db"
 DB_USER="callims_db_user"
 DOMAIN="_"          # Nginx server_name; use _ for catch-all or set --domain
+ENABLE_HTTPS=false  # Generate a self-signed cert and serve HTTPS on :443
 PGVERSION="16"
 SKIP_NGINX=false
 SKIP_FIREWALL=false
@@ -36,6 +38,7 @@ while [[ $# -gt 0 ]]; do
     --db-name)      DB_NAME="$2";    shift 2 ;;
     --skip-nginx)   SKIP_NGINX=true; shift   ;;
     --skip-firewall) SKIP_FIREWALL=true; shift ;;
+    --enable-https) ENABLE_HTTPS=true; shift ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done
@@ -616,6 +619,48 @@ EOF
   success "Systemd services created and started."
 }
 
+# ── Self-signed TLS cert (optional, for --enable-https) ───────────────────────
+setup_ssl_cert() {
+  [[ "$ENABLE_HTTPS" == true ]] || return 0
+  [[ "$SKIP_NGINX" == true ]]   && { warn "--enable-https set but --skip-nginx active; not generating cert."; return 0; }
+
+  step "Generating self-signed TLS certificate"
+
+  SSL_DIR="/etc/ssl/callims"
+  SSL_CERT="$SSL_DIR/cert.pem"
+  SSL_KEY="$SSL_DIR/key.pem"
+
+  mkdir -p "$SSL_DIR"
+
+  if [[ -f "$SSL_CERT" && -f "$SSL_KEY" ]]; then
+    info "Existing cert found at $SSL_CERT — reusing. Delete the files and rerun to regenerate."
+    return 0
+  fi
+
+  CERT_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+  CERT_HOST="$(hostname -f 2>/dev/null || hostname)"
+
+  # Build subjectAltName list: localhost + IPs + hostname + --domain (if real)
+  SAN="DNS:localhost,IP:127.0.0.1"
+  [[ -n "$CERT_IP" ]]   && SAN="${SAN},IP:${CERT_IP}"
+  [[ -n "$CERT_HOST" ]] && SAN="${SAN},DNS:${CERT_HOST}"
+  [[ "$DOMAIN" != "_" && -n "$DOMAIN" ]] && SAN="${SAN},DNS:${DOMAIN}"
+
+  # CN: prefer real domain, then hostname, then IP
+  CERT_CN="$DOMAIN"
+  [[ "$CERT_CN" == "_" || -z "$CERT_CN" ]] && CERT_CN="${CERT_HOST:-${CERT_IP:-localhost}}"
+
+  openssl req -x509 -nodes -newkey rsa:4096 -days 3650 \
+    -keyout "$SSL_KEY" -out "$SSL_CERT" \
+    -subj "/CN=${CERT_CN}/O=CalLIMS" \
+    -addext "subjectAltName=${SAN}" >/dev/null 2>&1
+
+  chmod 644 "$SSL_CERT"
+  chmod 600 "$SSL_KEY"
+
+  success "Self-signed cert written to $SSL_CERT (SAN: $SAN)"
+}
+
 # ── Nginx ─────────────────────────────────────────────────────────────────────
 setup_nginx() {
   if [[ "$SKIP_NGINX" == true ]]; then
@@ -625,18 +670,15 @@ setup_nginx() {
 
   step "Configuring Nginx"
 
-  NGINX_CONF_CONTENT="server {
-    listen 80;
-    server_name ${DOMAIN};
-
+  # Shared location blocks reused by both the HTTP-only and the HTTPS vhost
+  read -r -d '' NGINX_APP_BLOCK <<EOF || true
     client_max_body_size 20M;
 
-    # Static files (served by whitenoise via Django, but Nginx can also serve directly)
     location /static/ {
         alias ${APP_DIR}/staticfiles/;
         expires 30d;
         access_log off;
-        add_header Cache-Control \"public, immutable\";
+        add_header Cache-Control "public, immutable";
     }
 
     location /media/ {
@@ -645,7 +687,6 @@ setup_nginx() {
         access_log off;
     }
 
-    # Proxy all other requests to Gunicorn
     location / {
         proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host \$host;
@@ -659,7 +700,40 @@ setup_nginx() {
 
     access_log /var/log/nginx/callims_access.log;
     error_log  /var/log/nginx/callims_error.log;
+EOF
+
+  if [[ "$ENABLE_HTTPS" == true ]]; then
+    NGINX_CONF_CONTENT="# HTTP → HTTPS redirect
+server {
+    listen 80;
+    server_name ${DOMAIN};
+    return 301 https://\$host\$request_uri;
+}
+
+# HTTPS app server (self-signed cert; browser warns on first visit)
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${DOMAIN};
+
+    ssl_certificate     /etc/ssl/callims/cert.pem;
+    ssl_certificate_key /etc/ssl/callims/key.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 1d;
+
+${NGINX_APP_BLOCK}
 }"
+  else
+    NGINX_CONF_CONTENT="server {
+    listen 80;
+    server_name ${DOMAIN};
+
+${NGINX_APP_BLOCK}
+}"
+  fi
 
   if [[ "$PKG_FAMILY" == "debian" ]]; then
     NGINX_CONF_PATH="/etc/nginx/sites-available/callims"
@@ -673,6 +747,15 @@ setup_nginx() {
     echo "$NGINX_CONF_CONTENT" > "$NGINX_CONF_PATH"
     # Remove default conf
     rm -f /etc/nginx/conf.d/default.conf
+  fi
+
+  # Fall back to the legacy "listen 443 ssl http2" form if the split syntax
+  # isn't supported (nginx < 1.25, e.g. Ubuntu 22.04 stock).
+  if ! nginx -t >/dev/null 2>&1; then
+    info "nginx -t failed with split http2 directive; retrying with legacy syntax"
+    sed -i 's|listen 443 ssl;\n *http2 on;|listen 443 ssl http2;|' "$NGINX_CONF_PATH" 2>/dev/null
+    # sed -i with \n is GNU-only; do a 2-line collapse the portable way
+    perl -i -0pe 's/listen 443 ssl;\s*\n\s*http2 on;/listen 443 ssl http2;/' "$NGINX_CONF_PATH" 2>/dev/null || true
   fi
 
   nginx -t && systemctl enable --now nginx && systemctl reload nginx
@@ -742,7 +825,9 @@ print_summary() {
   echo "║         Developed by AUJ Tech  |  www.auj-it.com            ║"
   echo "╚══════════════════════════════════════════════════════════════╝"
   echo -e "${NC}"
-  echo -e "  ${BOLD}Application URL${NC}  : http://${DOMAIN//_/$SERVER_IP}"
+  URL_SCHEME="http"
+  [[ "$ENABLE_HTTPS" == true ]] && URL_SCHEME="https"
+  echo -e "  ${BOLD}Application URL${NC}  : ${URL_SCHEME}://${DOMAIN//_/$SERVER_IP}"
   echo -e "  ${BOLD}App directory${NC}    : $APP_DIR"
   echo -e "  ${BOLD}Config file${NC}      : $ENV_FILE"
   echo -e "  ${BOLD}Log directory${NC}    : $APP_DIR/logs/"
@@ -759,9 +844,14 @@ print_summary() {
   echo "    Generate license : sudo -u $APP_USER $VENV_DIR/bin/python $APP_DIR/manage.py generate_license --issued-to \"Lab\" --tier PROFESSIONAL --days 365"
   echo ""
   echo -e "  ${YELLOW}Next steps:${NC}"
-  echo "    1. Open http://${DOMAIN//_/$SERVER_IP}/auth/login/ and log in with the admin account."
+  echo "    1. Open ${URL_SCHEME}://${DOMAIN//_/$SERVER_IP}/auth/login/ and log in with the admin account."
   echo "    2. Activate the license at /license/status/ using the key printed above."
-  echo "    3. For HTTPS, run: certbot --nginx -d yourdomain.com"
+  if [[ "$ENABLE_HTTPS" == true ]]; then
+    echo "    3. The TLS cert is self-signed — browsers will warn once; trust it and continue."
+    echo "       For a real cert with a public domain, run: certbot --nginx -d yourdomain.com"
+  else
+    echo "    3. To enable HTTPS later, rerun with --enable-https (or use certbot for a real cert)."
+  fi
   echo "    4. Edit $ENV_FILE to configure SMTP email settings."
   echo ""
 }
@@ -795,6 +885,7 @@ main() {
   setup_django
   create_superuser
   create_systemd_services
+  setup_ssl_cert
   setup_nginx
   setup_firewall
   generate_license
