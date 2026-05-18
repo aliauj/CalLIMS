@@ -397,13 +397,32 @@ setup_database() {
 create_env_file() {
   step "Writing .env configuration file"
 
+  # Preserve secrets across re-installs. Regenerating SECRET_KEY logs every
+  # user out; regenerating LICENSE_SECRET_KEY invalidates every license key
+  # ever issued by this install. If an existing .env has these values, reuse
+  # them and only generate fresh ones on a true first install.
+  EXISTING_SECRET_KEY=""
+  EXISTING_LICENSE_SECRET=""
   if [[ -f "$ENV_FILE" ]]; then
-    warn ".env already exists at $ENV_FILE — backing up to .env.bak"
+    warn ".env already exists at $ENV_FILE — preserving secrets, backing up to .env.bak"
     cp "$ENV_FILE" "${ENV_FILE}.bak"
+    EXISTING_SECRET_KEY=$(awk -F= '/^SECRET_KEY=/{sub(/^SECRET_KEY=/,""); print; exit}' "$ENV_FILE")
+    EXISTING_LICENSE_SECRET=$(awk -F= '/^LICENSE_SECRET_KEY=/{sub(/^LICENSE_SECRET_KEY=/,""); print; exit}' "$ENV_FILE")
   fi
 
-  SECRET_KEY="$(gen_secret)"
-  LICENSE_SECRET="$(gen_secret)"
+  if [[ -n "$EXISTING_SECRET_KEY" ]]; then
+    SECRET_KEY="$EXISTING_SECRET_KEY"
+    info "Reusing existing SECRET_KEY from .env"
+  else
+    SECRET_KEY="$(gen_secret)"
+  fi
+
+  if [[ -n "$EXISTING_LICENSE_SECRET" ]]; then
+    LICENSE_SECRET="$EXISTING_LICENSE_SECRET"
+    info "Reusing existing LICENSE_SECRET_KEY — previously issued license keys remain valid"
+  else
+    LICENSE_SECRET="$(gen_secret)"
+  fi
 
   # Build ALLOWED_HOSTS — Django rejects "_" so we always include real
   # hostnames/IPs. When --domain wasn't provided, DOMAIN is "_" (Nginx
