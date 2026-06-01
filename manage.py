@@ -6,7 +6,15 @@ import sys
 
 def main():
     """Run administrative tasks."""
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.development')
+    # Prefer DJANGO_SETTINGS_MODULE from the process env, then .env (read via
+    # decouple), and fall back to development settings for local work. Without
+    # the decouple lookup, production boxes crash on `manage.py shell` etc.
+    # because the .env value is never consulted before Django imports settings.
+    from decouple import config
+    os.environ.setdefault(
+        'DJANGO_SETTINGS_MODULE',
+        config('DJANGO_SETTINGS_MODULE', default='config.settings.development'),
+    )
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:
