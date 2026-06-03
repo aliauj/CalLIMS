@@ -2,6 +2,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
+from apps.licensing.decorators import module_required
 from apps.certificates.models import Certificate
 from apps.assets.models import Instrument
 
@@ -17,6 +18,7 @@ def _client_guard(request):
 
 
 @login_required
+@module_required('portal')
 def portal_dashboard(request):
     client = _client_guard(request)
     if client is None:
@@ -40,6 +42,7 @@ def portal_dashboard(request):
 
 
 @login_required
+@module_required('portal')
 def portal_instrument_detail(request, pk):
     client = _client_guard(request)
     if client is None:

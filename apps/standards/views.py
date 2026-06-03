@@ -3,10 +3,14 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
+from apps.licensing.decorators import module_required
+from apps.users.permissions import lab_staff_required
 from .models import ReferenceStandard, MeasurementUnit, StandardUncertainty
 
 
 @login_required
+@lab_staff_required
+@module_required('standards')
 def standard_list(request):
     qs = list(ReferenceStandard.objects.select_related('uncertainty_unit', 'custodian').order_by('name'))
     today = timezone.now().date()
@@ -23,6 +27,8 @@ def standard_list(request):
 
 
 @login_required
+@lab_staff_required
+@module_required('standards')
 def standard_detail(request, pk):
     std = get_object_or_404(
         ReferenceStandard.objects.select_related('uncertainty_unit', 'custodian')
@@ -33,6 +39,8 @@ def standard_detail(request, pk):
 
 
 @login_required
+@lab_staff_required
+@module_required('standards')
 def standard_create(request):
     if request.method == 'POST':
         ReferenceStandard.objects.create(
@@ -57,6 +65,8 @@ def standard_create(request):
 
 
 @login_required
+@lab_staff_required
+@module_required('standards')
 def standard_edit(request, pk):
     """Edit a reference standard — uncertainty, traceability, dates, status."""
     if request.user.role not in ('ADMIN', 'MANAGER'):

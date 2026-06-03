@@ -3,7 +3,26 @@ from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 from django.http import FileResponse, Http404
+from apps.licensing.decorators import module_required
+from apps.users.permissions import lab_staff_required
 from .models import Certificate, CertificateTemplate
+
+
+def _scoped_certificate_qs(user, base_qs=None):
+    """Restrict certificate access to the requesting user's tenant.
+
+    Lab staff see every certificate; a CLIENT user only ever sees certificates
+    whose underlying instrument belongs to their own client profile. Returns an
+    empty queryset for a CLIENT without a linked profile so get_object_or_404
+    yields a clean 404 instead of leaking another tenant's certificate.
+    """
+    qs = base_qs if base_qs is not None else Certificate.objects.all()
+    if user.is_client:
+        try:
+            return qs.filter(job__instrument__client=user.client_profile)
+        except Exception:
+            return qs.none()
+    return qs
 
 # Ordered list of all fields that can appear on the QR verification page.
 QR_FIELD_CHOICES = [
@@ -35,6 +54,7 @@ _QR_DEFAULTS = [
 
 
 @login_required
+@module_required('certificates')
 def certificate_list(request):
     qs = Certificate.objects.select_related(
         'job__instrument__client',
@@ -89,10 +109,14 @@ def certificate_list(request):
 
 
 @login_required
+@module_required('certificates')
 def certificate_detail(request, pk):
     cert = get_object_or_404(
-        Certificate.objects.select_related(
-            'job__instrument', 'job__method', 'signed_by', 'superseded_by'
+        _scoped_certificate_qs(
+            request.user,
+            Certificate.objects.select_related(
+                'job__instrument', 'job__method', 'signed_by', 'superseded_by'
+            ),
         ),
         pk=pk,
     )
@@ -105,6 +129,8 @@ def certificate_detail(request, pk):
 
 
 @login_required
+@lab_staff_required
+@module_required('certificates')
 def certificate_edit(request, pk):
     """Edit certificate header information: dates, signatory, notes."""
     cert = get_object_or_404(Certificate, pk=pk)
@@ -133,6 +159,8 @@ def certificate_edit(request, pk):
 
 
 @login_required
+@lab_staff_required
+@module_required('certificates')
 def certificate_sign(request, pk):
     """Sign the certificate — stamps the current user as signatory."""
     cert = get_object_or_404(Certificate, pk=pk)
@@ -162,6 +190,8 @@ def certificate_sign(request, pk):
 
 
 @login_required
+@lab_staff_required
+@module_required('certificates')
 def certificate_issue(request, pk):
     """Issue the certificate (SIGNED → ISSUED) — makes it available to the client."""
     cert = get_object_or_404(Certificate, pk=pk)
@@ -176,6 +206,8 @@ def certificate_issue(request, pk):
 
 
 @login_required
+@lab_staff_required
+@module_required('certificates')
 def certificate_revoke(request, pk):
     """Revoke a signed or issued certificate with a mandatory reason."""
     cert = get_object_or_404(Certificate, pk=pk)
@@ -198,6 +230,8 @@ def certificate_revoke(request, pk):
 
 
 @login_required
+@lab_staff_required
+@module_required('certificates')
 def certificate_regenerate_pdf(request, pk):
     """Trigger PDF regeneration manually."""
     cert = get_object_or_404(Certificate, pk=pk)
@@ -209,15 +243,17 @@ def certificate_regenerate_pdf(request, pk):
 
 
 @login_required
+@module_required('certificates')
 def certificate_pdf(request, pk):
     """Serve the pre-generated PDF file."""
-    cert = get_object_or_404(Certificate, pk=pk)
+    cert = get_object_or_404(_scoped_certificate_qs(request.user), pk=pk)
     if cert.pdf_file:
         return FileResponse(cert.pdf_file.open(), content_type='application/pdf')
     raise Http404('PDF not yet generated')
 
 
 @login_required
+@module_required('certificates')
 def certificate_print(request, pk):
     """Generate PDF on-demand and stream it — no Celery required."""
     import io
@@ -228,10 +264,13 @@ def certificate_print(request, pk):
     from django.core.files.base import ContentFile
 
     cert = get_object_or_404(
-        Certificate.objects.select_related(
-            'job__instrument__client',
-            'job__method__certificate_template',
-            'signed_by',
+        _scoped_certificate_qs(
+            request.user,
+            Certificate.objects.select_related(
+                'job__instrument__client',
+                'job__method__certificate_template',
+                'signed_by',
+            ),
         ),
         pk=pk,
     )
@@ -300,6 +339,7 @@ def certificate_print(request, pk):
     return response
 
 
+@module_required('certificates')
 def certificate_verify(request, pk):
     """
     Public certificate verification page — no login required.
@@ -391,6 +431,7 @@ def certificate_verify(request, pk):
 
 
 @login_required
+@module_required('certificates')
 def certificate_sticker_pdf(request, pk):
     """Generate and stream a standalone 75×50 mm sticker PDF for a certificate."""
     import io, base64, qrcode
@@ -398,11 +439,14 @@ def certificate_sticker_pdf(request, pk):
     from django.http import HttpResponse
 
     cert = get_object_or_404(
-        Certificate.objects.select_related(
-            'job__instrument__client',
-            'job__method__certificate_template',
-            'signed_by',
-            'job__assigned_to',
+        _scoped_certificate_qs(
+            request.user,
+            Certificate.objects.select_related(
+                'job__instrument__client',
+                'job__method__certificate_template',
+                'signed_by',
+                'job__assigned_to',
+            ),
         ),
         pk=pk,
     )

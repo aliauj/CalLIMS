@@ -1,9 +1,21 @@
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.http import HttpResponseForbidden
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
+from apps.users.permissions import lab_staff_required
 from .models import Instrument, InstrumentCategory
 from apps.clients.models import Client
+
+
+def _client_can_view_instrument(user, instrument):
+    """CLIENT users may only view their own instruments."""
+    if not user.is_client:
+        return True
+    try:
+        return instrument.client_id == user.client_profile.pk
+    except Exception:
+        return False
 
 
 def _build_export_qs(request):
@@ -143,11 +155,14 @@ def instrument_detail(request, pk):
     obj = get_object_or_404(
         Instrument.objects.select_related('client', 'category', 'created_by'), pk=pk
     )
+    if not _client_can_view_instrument(request.user, obj):
+        return HttpResponseForbidden('Access restricted.')
     jobs = obj.calibration_jobs.select_related('method').order_by('-created_at')[:10]
     return render(request, 'instruments/instrument_detail.html', {'instrument': obj, 'jobs': jobs})
 
 
 @login_required
+@lab_staff_required
 def instrument_edit(request, pk):
     obj = get_object_or_404(Instrument, pk=pk)
     if request.method == 'POST':
@@ -187,6 +202,7 @@ def instrument_edit(request, pk):
 
 
 @login_required
+@lab_staff_required
 def instrument_create(request):
     if request.method == 'POST':
         category_id = request.POST.get('category') or None
@@ -242,6 +258,7 @@ def instrument_create(request):
 
 
 @login_required
+@lab_staff_required
 def instrument_bulk_delete(request):
     """Delete selected instruments that have no calibration jobs."""
     if request.method != 'POST':
@@ -266,6 +283,7 @@ def instrument_bulk_delete(request):
 
 
 @login_required
+@lab_staff_required
 def instrument_duplicate(request, pk):
     """Create a copy of an instrument with a new asset tag, serial number, and optional different client."""
     original = get_object_or_404(Instrument, pk=pk)
@@ -465,6 +483,8 @@ def sticker_pdf(request, pk):
     from django.http import HttpResponse
 
     obj = get_object_or_404(Instrument.objects.select_related('client', 'category'), pk=pk)
+    if not _client_can_view_instrument(request.user, obj):
+        return HttpResponseForbidden('Access restricted.')
 
     cert = None
     latest_job = obj.calibration_jobs.filter(status='completed').select_related(

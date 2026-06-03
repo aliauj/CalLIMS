@@ -2,6 +2,7 @@ from functools import wraps
 from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
+from apps.licensing.decorators import module_required
 from .models import RFQ, RFQItem
 from apps.clients.models import Client
 from apps.assets.models import Instrument, InstrumentCategory
@@ -12,8 +13,9 @@ REVIEW_ROLES = ('MANAGER', 'ADMIN')
 
 
 def sales_required(view_func):
-    """Allow SALES, MANAGER, or ADMIN."""
+    """Allow SALES, MANAGER, or ADMIN, and require the sales module license."""
     @wraps(view_func)
+    @module_required('sales')
     def wrapper(request, *args, **kwargs):
         if not request.user.is_authenticated:
             return redirect('users:login')
@@ -25,8 +27,9 @@ def sales_required(view_func):
 
 
 def review_required(view_func):
-    """Allow MANAGER or ADMIN only."""
+    """Allow MANAGER or ADMIN only, and require the sales module license."""
     @wraps(view_func)
+    @module_required('sales')
     def wrapper(request, *args, **kwargs):
         if not request.user.is_authenticated:
             return redirect('users:login')

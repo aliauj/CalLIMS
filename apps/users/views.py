@@ -5,9 +5,14 @@ from django.shortcuts import render, redirect
 from django.utils import timezone
 
 
+def _post_login_target(user):
+    """Where to send a freshly-authenticated user — clients go to the portal."""
+    return 'portal:dashboard' if user.is_client else 'workflows:dashboard'
+
+
 def login_view(request):
     if request.user.is_authenticated:
-        return redirect('workflows:dashboard')
+        return redirect(_post_login_target(request.user))
     if request.method == 'POST':
         email = request.POST.get('email', '').strip()
         password = request.POST.get('password', '')
@@ -20,7 +25,7 @@ def login_view(request):
                 user.last_login_ip = request.META.get('REMOTE_ADDR')
                 user.save(update_fields=['failed_login_attempts', 'last_login_ip'])
                 login(request, user)
-                return redirect(request.GET.get('next', 'workflows:dashboard'))
+                return redirect(request.GET.get('next') or _post_login_target(user))
         else:
             from apps.users.models import User
             try:

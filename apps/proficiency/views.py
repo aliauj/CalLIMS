@@ -2,9 +2,13 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from apps.licensing.decorators import module_required
+from apps.users.permissions import lab_staff_required
 
 
 @login_required
+@lab_staff_required
+@module_required('proficiency')
 def scheme_list(request):
     from .models import PTScheme
 
@@ -21,6 +25,8 @@ def scheme_list(request):
 
 
 @login_required
+@lab_staff_required
+@module_required('proficiency')
 def scheme_detail(request, pk):
     from .models import PTScheme
 
@@ -39,6 +45,8 @@ def scheme_detail(request, pk):
 
 
 @login_required
+@lab_staff_required
+@module_required('proficiency')
 def scheme_create(request):
     from .models import PTProvider, PTScheme
 
@@ -75,6 +83,8 @@ def scheme_create(request):
 
 
 @login_required
+@lab_staff_required
+@module_required('proficiency')
 def scheme_edit(request, pk):
     from .models import PTProvider, PTScheme
 
@@ -112,6 +122,8 @@ def scheme_edit(request, pk):
 
 
 @login_required
+@lab_staff_required
+@module_required('proficiency')
 def participation_create(request, scheme_pk):
     from django.contrib.auth import get_user_model
 
@@ -154,6 +166,8 @@ def participation_create(request, scheme_pk):
 
 
 @login_required
+@lab_staff_required
+@module_required('proficiency')
 def participation_detail(request, pk):
     from .models import PTParticipation
 
@@ -174,6 +188,8 @@ def participation_detail(request, pk):
 
 
 @login_required
+@lab_staff_required
+@module_required('proficiency')
 def submit_results(request, pk):
     from .models import PTParticipation
 
@@ -201,6 +217,8 @@ def submit_results(request, pk):
 
 
 @login_required
+@lab_staff_required
+@module_required('proficiency')
 def corrective_action(request, pk):
     from .models import PTParticipation
 
@@ -222,6 +240,8 @@ def corrective_action(request, pk):
 
 
 @login_required
+@lab_staff_required
+@module_required('proficiency')
 def provider_list(request):
     from .models import PTProvider
 
@@ -233,6 +253,8 @@ def provider_list(request):
 
 
 @login_required
+@lab_staff_required
+@module_required('proficiency')
 def provider_create(request):
     from .models import PTProvider
 
@@ -258,6 +280,8 @@ def provider_create(request):
 
 
 @login_required
+@lab_staff_required
+@module_required('proficiency')
 def provider_edit(request, pk):
     from .models import PTProvider
 
