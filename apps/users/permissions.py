@@ -94,3 +94,28 @@ def require_perm(section, action='view'):
             return fn(request, *args, **kwargs)
         return wrapper
     return decorator
+
+
+def lab_staff_required(view_func):
+    """Block CLIENT users from lab-internal views.
+
+    CLIENT users are redirected to the portal dashboard so they land somewhere
+    useful instead of staring at a 403; non-lab custom roles get an explicit
+    403 since they have no portal of their own.
+    """
+    from functools import wraps
+    from django.http import HttpResponseForbidden
+    from django.shortcuts import redirect
+
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        user = request.user
+        if not user.is_authenticated:
+            return redirect('users:login')
+        if user.is_client:
+            return redirect('portal:dashboard')
+        if not user.is_lab_staff:
+            return HttpResponseForbidden('Access restricted to lab staff.')
+        return view_func(request, *args, **kwargs)
+
+    return wrapper

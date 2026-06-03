@@ -5,12 +5,14 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
+from apps.users.permissions import lab_staff_required
 from .models import CalibrationJob, CalibrationMethod, CalibrationPoint, MeasurementResult
 from apps.assets.models import Instrument
 from apps.standards.models import ReferenceStandard
 
 
 @login_required
+@lab_staff_required
 def dashboard(request):
     today = timezone.now().date()
     user = request.user
@@ -65,6 +67,7 @@ def dashboard(request):
 
 
 @login_required
+@lab_staff_required
 def job_list(request):
     qs = CalibrationJob.objects.select_related(
         'instrument', 'assigned_to', 'method'
@@ -82,6 +85,7 @@ def job_list(request):
 
 
 @login_required
+@lab_staff_required
 def job_detail(request, pk):
     from django.db.models import Q
     from apps.users.models import User, TechnicianMethodAuthorization
@@ -122,6 +126,7 @@ def job_detail(request, pk):
 
 
 @login_required
+@lab_staff_required
 def job_create(request):
     if request.method == 'POST':
         instrument_id = request.POST.get('instrument')
@@ -160,6 +165,7 @@ def job_create(request):
 # ── FSM TRANSITIONS ──────────────────────────────────────────────
 
 @login_required
+@lab_staff_required
 def job_assign(request, pk):
     """Assign a technician and move job to ASSIGNED."""
     from django.db.models import Q
@@ -195,6 +201,7 @@ def job_assign(request, pk):
 
 
 @login_required
+@lab_staff_required
 def job_start(request, pk):
     """Move job from ASSIGNED → IN_PROGRESS."""
     job = get_object_or_404(CalibrationJob, pk=pk)
@@ -209,6 +216,7 @@ def job_start(request, pk):
 
 
 @login_required
+@lab_staff_required
 def job_submit_review(request, pk):
     """Move job from IN_PROGRESS → UNDER REVIEW and notify managers."""
     job = get_object_or_404(CalibrationJob, pk=pk)
@@ -227,6 +235,7 @@ def job_submit_review(request, pk):
 
 
 @login_required
+@lab_staff_required
 def job_approve(request, pk):
     """Move job from REVIEW → APPROVED and notify the assigned technician."""
     job = get_object_or_404(CalibrationJob, pk=pk)
@@ -247,6 +256,7 @@ def job_approve(request, pk):
 
 
 @login_required
+@lab_staff_required
 def job_reject(request, pk):
     """Move job from REVIEW → back to IN_PROGRESS with a mandatory rejection reason."""
     job = get_object_or_404(CalibrationJob, pk=pk)
@@ -270,6 +280,7 @@ def job_reject(request, pk):
 
 
 @login_required
+@lab_staff_required
 def job_complete(request, pk):
     """Move job from APPROVED → COMPLETED and update equipment dates."""
     job = get_object_or_404(CalibrationJob, pk=pk)
@@ -293,6 +304,7 @@ def job_complete(request, pk):
 
 
 @login_required
+@lab_staff_required
 def job_hold(request, pk):
     job = get_object_or_404(CalibrationJob, pk=pk)
     if request.method == 'POST':
@@ -306,6 +318,7 @@ def job_hold(request, pk):
 
 
 @login_required
+@lab_staff_required
 def job_delete(request, pk):
     """Permanently delete a job. Admin/Manager only — for cancelled customer requests."""
     from django.db.models import ProtectedError
@@ -334,6 +347,7 @@ def job_delete(request, pk):
 # ── DATA ENTRY ────────────────────────────────────────────────────
 
 @login_required
+@lab_staff_required
 def job_enter_results(request, pk):
     """Technician enters DUT readings at each calibration point."""
     job = get_object_or_404(

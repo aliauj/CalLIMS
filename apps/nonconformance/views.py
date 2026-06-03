@@ -3,6 +3,8 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
+from apps.licensing.decorators import module_required
+from apps.users.permissions import lab_staff_required
 from .models import Nonconformance, CorrectiveAction
 
 
@@ -41,6 +43,8 @@ def _certs_by_client_json():
 
 
 @login_required
+@lab_staff_required
+@module_required('nonconformance')
 def nc_list(request):
     qs = Nonconformance.objects.select_related(
         'detected_by', 'technician', 'certificate', 'job'
@@ -61,6 +65,8 @@ def nc_list(request):
 
 
 @login_required
+@lab_staff_required
+@module_required('nonconformance')
 def nc_detail(request, pk):
     nc = get_object_or_404(
         Nonconformance.objects.select_related(
@@ -77,6 +83,8 @@ def nc_detail(request, pk):
 
 
 @login_required
+@lab_staff_required
+@module_required('nonconformance')
 def nc_create(request):
     """
     Create a new NC. Accepts GET params:
@@ -152,6 +160,8 @@ def nc_create(request):
 
 
 @login_required
+@lab_staff_required
+@module_required('nonconformance')
 def nc_edit(request, pk):
     nc = get_object_or_404(Nonconformance, pk=pk)
     if nc.status == Nonconformance.Status.CLOSED:
@@ -200,6 +210,8 @@ def nc_edit(request, pk):
 
 
 @login_required
+@lab_staff_required
+@module_required('nonconformance')
 def nc_close(request, pk):
     if request.user.role not in ('ADMIN', 'MANAGER'):
         messages.error(request, 'Only ADMIN or MANAGER can close a nonconformance.')
@@ -219,6 +231,8 @@ def nc_close(request, pk):
 # ── CAPA views ────────────────────────────────────────────────────────────────
 
 @login_required
+@lab_staff_required
+@module_required('nonconformance')
 def capa_create(request, nc_pk):
     nc = get_object_or_404(Nonconformance, pk=nc_pk)
     if nc.status == Nonconformance.Status.CLOSED:
@@ -249,6 +263,8 @@ def capa_create(request, nc_pk):
 
 
 @login_required
+@lab_staff_required
+@module_required('nonconformance')
 def capa_edit(request, pk):
     capa = get_object_or_404(CorrectiveAction.objects.select_related('nonconformance'), pk=pk)
     nc = capa.nonconformance
@@ -275,6 +291,8 @@ def capa_edit(request, pk):
 
 
 @login_required
+@lab_staff_required
+@module_required('nonconformance')
 def capa_complete(request, pk):
     capa = get_object_or_404(CorrectiveAction.objects.select_related('nonconformance'), pk=pk)
     nc = capa.nonconformance
@@ -303,6 +321,8 @@ def capa_complete(request, pk):
 
 
 @login_required
+@lab_staff_required
+@module_required('nonconformance')
 def capa_verify(request, pk):
     if request.user.role not in ('ADMIN', 'MANAGER', 'REVIEWER'):
         messages.error(request, 'Only ADMIN, MANAGER, or REVIEWER can verify actions.')

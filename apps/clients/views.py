@@ -1,16 +1,22 @@
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
+from apps.licensing.decorators import module_required
+from apps.users.permissions import lab_staff_required
 from .models import Client
 
 
 @login_required
+@lab_staff_required
+@module_required('clients')
 def client_list(request):
     clients = Client.objects.all().order_by('name')
     return render(request, 'clients/client_list.html', {'clients': clients})
 
 
 @login_required
+@lab_staff_required
+@module_required('clients')
 def client_detail(request, pk):
     client = get_object_or_404(Client, pk=pk)
     instruments = client.instruments.all().order_by('asset_tag')
@@ -18,6 +24,8 @@ def client_detail(request, pk):
 
 
 @login_required
+@lab_staff_required
+@module_required('clients')
 def client_create(request):
     if request.method == 'POST':
         Client.objects.create(
